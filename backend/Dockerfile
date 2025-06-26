@@ -31,8 +31,7 @@ RUN ./copy_cert_assets.sh
 
 RUN rm -rf ./certs-temp
 
-# RUN yarn build
-COPY backend/build ./build
+RUN yarn build
 
 EXPOSE 3000
 
