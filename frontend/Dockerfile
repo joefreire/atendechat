@@ -34,8 +34,7 @@ RUN ./copy_brand_assets.sh
 RUN rm -rf ./brands
 
 # Build the application
-# RUN yarn build
-COPY frontend/build ./build
+RUN yarn build
 
 EXPOSE 3001
 
