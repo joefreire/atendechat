@@ -324,6 +324,7 @@ show_help() {
     echo -e "  $0 remove-ssl [OPÇÕES]"
     echo -e "  $0 renew-ssl [OPÇÕES]"
     echo -e "  $0 list-ssl"
+    echo -e "  $0 setup-nginx [OPÇÕES]"
     echo -e "\n${GREEN}🔧 Comandos:${NC}"
     echo -e "  🚀 up          - Inicia uma nova stack (salva configuração)"
     echo -e "  🛑 down        - Para uma stack"
@@ -337,6 +338,7 @@ show_help() {
     echo -e "  🗑️  remove-ssl  - Remove SSL de uma instância"
     echo -e "  🔄 renew-ssl   - Renova certificados SSL"
     echo -e "  📋 list-ssl    - Lista configurações SSL ativas"
+    echo -e "  🌐 setup-nginx - Configura Nginx e Certbot para uma stack existente"
     echo -e "\n${GREEN}⚙️  Opções para 'up':${NC}"
     echo -e "  -n, --name STACK_NAME     Nome da stack (padrão: codatende)"
     echo -e "  -b, --backend-port PORT   Porta do backend (padrão: 3000)"
@@ -354,6 +356,8 @@ show_help() {
     echo -e "  -n, --name STACK_NAME     Nome da stack"
     echo -e "  -u, --backend-url URL     URL do backend (obrigatório)"
     echo -e "  -w, --frontend-url URL    URL do frontend (obrigatório)"
+    echo -e "\n${GREEN}🌐 Opções para 'setup-nginx':${NC}"
+    echo -e "  -n, --name STACK_NAME     Nome da stack (obrigatório)"
     echo -e "\n${GREEN}⚙️  Opções para outros comandos:${NC}"
     echo -e "  -n, --name STACK_NAME     Nome da stack (padrão: codatende)"
     echo -e "\n${GREEN}💡 Exemplos:${NC}"
@@ -362,6 +366,7 @@ show_help() {
     echo -e "  $0 up --name codatende2 --backend-port 4000 --frontend-port 4001"
     echo -e "  $0 up -n codatende3 -b 5000 -f 5001 -c 2 -m 2048"
     echo -e "  $0 up -n codatende4 -u https://api.exemplo.com -w https://app.exemplo.com"
+    echo -e "  $0 up -n codatende5 -b 6000 -f 6001 -u https://api.meudominio.com -w https://app.meudominio.com"
     echo -e "\n  # 💰 Criar instância com módulo financeiro habilitado"
     echo -e "  $0 up -n codatende-finance -e -g CLIENT_ID -s CLIENT_SECRET -p PIX_KEY"
     echo -e "  $0 up --name codatende-finance --enable-financial --gerencianet-client-id CLIENT_ID --gerencianet-client-secret CLIENT_SECRET --gerencianet-pix-key PIX_KEY"
@@ -403,6 +408,14 @@ show_help() {
     echo -e "      Certificados são renovados automaticamente via cron job"
     echo -e "      Use 'ssl' para configurar HTTPS em um domínio"
     echo -e "      Use 'list-ssl' para ver configurações SSL ativas"
+    echo -e "\n${BLUE}🌐 Nginx Automático:${NC}"
+    echo -e "      O comando 'up' configura automaticamente o Nginx como proxy reverso"
+    echo -e "      Uma configuração básica HTTP é criada para acesso via localhost"
+    echo -e "      Use 'ssl' para configurar HTTPS com certificados Let's Encrypt"
+    echo -e "      O Nginx é habilitado para iniciar automaticamente com o sistema"
+    echo -e "\n  # 🌐 Configurar Nginx e Certbot para stack existente"
+    echo -e "  $0 setup-nginx -n codatende1"
+    echo -e "  $0 setup-nginx --name codatende2"
 }
 
 # Função para processar argumentos
@@ -775,6 +788,9 @@ up_stack() {
                 # Salva a instância no arquivo JSON
                 save_instance "$STACK_NAME" "$BACKEND_PORT" "$FRONTEND_PORT" "$BACKEND_URL" "$FRONTEND_URL" "$TOTAL_CPU" "$TOTAL_MEMORY" "$ENABLE_FINANCIAL" "$GERENCIANET_CLIENT_ID" "$GERENCIANET_CLIENT_SECRET" "$GERENCIANET_PIX_KEY"
                 
+                # Inicia e configura Nginx e Certbot
+                setup_nginx_and_certbot "$STACK_NAME"
+                
                 echo -e "\n${YELLOW}🔗 URLs de acesso:${NC}"
                 echo -e "Backend:  ${GREEN}$BACKEND_URL${NC}"
                 echo -e "Frontend: ${GREEN}$FRONTEND_URL${NC}"
@@ -821,6 +837,9 @@ down_stack() {
     docker-compose -p $STACK_NAME down
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✅ Stack $STACK_NAME parada com sucesso!${NC}"
+        
+        # Remove configuração básica do Nginx
+        remove_basic_nginx_config "$STACK_NAME"
         
         # Remove a instância do arquivo JSON
         remove_instance "$STACK_NAME"
@@ -1940,6 +1959,351 @@ list_ssl() {
     fi
 }
 
+# Função para configurar Nginx e Certbot automaticamente após o up da stack
+setup_nginx_and_certbot() {
+    local stack_name=$1
+    local is_standalone=${2:-false}  # Se true, é chamada via comando setup-nginx
+    
+    # Se for chamada via setup-nginx, valida se a stack existe
+    if [[ "$is_standalone" == "true" ]]; then
+        echo -e "${YELLOW}🔍 Verificando se a stack $stack_name existe...${NC}"
+        
+        # Verifica se a instância existe no banco
+        if ! load_instance "$stack_name"; then
+            echo -e "${RED}❌ Erro: Instância '$stack_name' não encontrada.${NC}"
+            echo -e "\n${YELLOW}📋 Instâncias disponíveis:${NC}"
+            list_instances
+            echo -e "\n${YELLOW}💡 Use 'up' para criar uma nova instância primeiro:${NC}"
+            echo -e "  ${GREEN}./manage-stacks.sh up -n $stack_name${NC}"
+            exit 1
+        fi
+        
+        # Verifica se os containers estão rodando
+        echo -e "${YELLOW}🔍 Verificando se os containers estão rodando...${NC}"
+        if ! docker-compose -p $stack_name ps | grep -q "Up"; then
+            echo -e "${RED}❌ Erro: Stack $stack_name não está rodando.${NC}"
+            echo -e "${YELLOW}💡 Inicie a stack primeiro:${NC}"
+            echo -e "  ${GREEN}./manage-stacks.sh up -n $stack_name${NC}"
+            exit 1
+        fi
+        
+        echo -e "${GREEN}✅ Stack $stack_name encontrada e rodando${NC}"
+    fi
+    
+    echo -e "\n${YELLOW}🌐 Configurando Nginx e Certbot para $stack_name...${NC}"
+    
+    # Verifica se o Nginx está rodando
+    if ! systemctl is-active --quiet nginx; then
+        echo -e "${YELLOW}🚀 Iniciando Nginx...${NC}"
+        if sudo systemctl start nginx; then
+            echo -e "${GREEN}✅ Nginx iniciado com sucesso${NC}"
+        else
+            echo -e "${RED}❌ Erro ao iniciar Nginx${NC}"
+            return 1
+        fi
+    else
+        echo -e "${GREEN}✅ Nginx já está rodando${NC}"
+    fi
+    
+    # Habilita Nginx para iniciar automaticamente
+    if ! systemctl is-enabled --quiet nginx; then
+        echo -e "${YELLOW}🔗 Habilitando Nginx para iniciar automaticamente...${NC}"
+        sudo systemctl enable nginx
+        echo -e "${GREEN}✅ Nginx habilitado para iniciar automaticamente${NC}"
+    fi
+    
+    # Verifica se o Certbot está instalado e funcionando
+    if ! command -v certbot &> /dev/null; then
+        echo -e "${YELLOW}📦 Instalando Certbot...${NC}"
+        install_useful_tools "$(detect_os_type)"
+    fi
+    
+    # Testa se o Certbot está funcionando
+    if certbot --version > /dev/null 2>&1; then
+        echo -e "${GREEN}✅ Certbot está funcionando corretamente${NC}"
+    else
+        echo -e "${RED}❌ Erro: Certbot não está funcionando corretamente${NC}"
+        return 1
+    fi
+    
+    # Configura renovação automática se ainda não estiver configurada
+    if ! sudo crontab -l 2>/dev/null | grep -q "certbot-renew.sh"; then
+        echo -e "${YELLOW}⏰ Configurando renovação automática de certificados...${NC}"
+        setup_certbot_cron
+    else
+        echo -e "${GREEN}✅ Renovação automática já está configurada${NC}"
+    fi
+    
+    # Cria configuração básica do Nginx para a stack (sem SSL ainda)
+    create_basic_nginx_config "$stack_name"
+    
+    # Carrega configuração para mostrar as URLs
+    if load_instance "$stack_name"; then
+        echo -e "${GREEN}✅ Nginx e Certbot configurados com sucesso!${NC}"
+        echo -e "${YELLOW}🌐 URLs configuradas:${NC}"
+        echo -e "Backend:  ${GREEN}$BACKEND_URL${NC}"
+        echo -e "Frontend: ${GREEN}$FRONTEND_URL${NC}"
+        echo -e "${YELLOW}💡 Para configurar SSL/HTTPS, use:${NC}"
+        echo -e "  ${GREEN}./manage-stacks.sh ssl -n $stack_name -u $BACKEND_URL -w $FRONTEND_URL${NC}"
+        echo -e "${YELLOW}💡 Para ver configurações SSL ativas:${NC}"
+        echo -e "  ${GREEN}./manage-stacks.sh list-ssl${NC}"
+    else
+        echo -e "${GREEN}✅ Nginx e Certbot configurados com sucesso!${NC}"
+        echo -e "${YELLOW}💡 Para configurar SSL/HTTPS, use:${NC}"
+        echo -e "  ${GREEN}./manage-stacks.sh ssl -n $stack_name -u https://api.seudominio.com -w https://app.seudominio.com${NC}"
+        echo -e "${YELLOW}💡 Para ver configurações SSL ativas:${NC}"
+        echo -e "  ${GREEN}./manage-stacks.sh list-ssl${NC}"
+    fi
+}
+
+# Função para detectar tipo de sistema operacional
+detect_os_type() {
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        if command -v apt-get &> /dev/null; then
+            echo "debian"
+        elif command -v yum &> /dev/null; then
+            echo "rhel"
+        elif command -v pacman &> /dev/null; then
+            echo "arch"
+        else
+            echo "linux"
+        fi
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "macos"
+    else
+        echo "unknown"
+    fi
+}
+
+# Função para criar configuração básica do Nginx (sem SSL)
+create_basic_nginx_config() {
+    local stack_name=$1
+    
+    echo -e "${YELLOW}📝 Criando configuração básica do Nginx para $stack_name...${NC}"
+    
+    # Carrega configuração da instância para obter as portas e URLs
+    if load_instance "$stack_name"; then
+        local backend_port="$BACKEND_PORT"
+        local frontend_port="$FRONTEND_PORT"
+        local backend_url="$BACKEND_URL"
+        local frontend_url="$FRONTEND_URL"
+    else
+        echo -e "${RED}❌ Erro ao carregar configuração da instância${NC}"
+        return 1
+    fi
+    
+    # Extrai domínios das URLs
+    local backend_domain=$(echo "$backend_url" | sed -E 's|^https?://([^:/]+).*|\1|')
+    local frontend_domain=$(echo "$frontend_url" | sed -E 's|^https?://([^:/]+).*|\1|')
+    
+    # Se as URLs são localhost, usa configuração local
+    if [[ "$backend_domain" == "localhost" && "$frontend_domain" == "localhost" ]]; then
+        create_local_nginx_config "$stack_name" "$backend_port" "$frontend_port"
+    else
+        create_domain_nginx_config "$stack_name" "$backend_domain" "$frontend_domain" "$backend_port" "$frontend_port"
+    fi
+}
+
+# Função para criar configuração do Nginx para domínios específicos
+create_domain_nginx_config() {
+    local stack_name=$1
+    local backend_domain=$2
+    local frontend_domain=$3
+    local backend_port=$4
+    local frontend_port=$5
+    
+    local nginx_config="/etc/nginx/sites-available/$stack_name-basic"
+    
+    echo -e "${YELLOW}🌐 Configurando Nginx para domínios específicos...${NC}"
+    echo -e "Backend:  ${GREEN}$backend_domain${NC} (porta: $backend_port)"
+    echo -e "Frontend: ${GREEN}$frontend_domain${NC} (porta: $frontend_port)"
+    
+    # Cria configuração para domínios específicos
+    sudo tee "$nginx_config" > /dev/null << EOF
+# Configuração Nginx para $stack_name (Domínios Específicos)
+# Backend: $backend_domain:$backend_port
+# Frontend: $frontend_domain:$frontend_port
+
+# Servidor para backend
+server {
+    listen 80;
+    server_name $backend_domain;
+    
+    # Proxy para o backend
+    location / {
+        proxy_pass http://localhost:$backend_port/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_read_timeout 86400;
+    }
+    
+    # Configurações para WebSocket
+    location /socket.io/ {
+        proxy_pass http://localhost:$backend_port/socket.io/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+
+# Servidor para frontend
+server {
+    listen 80;
+    server_name $frontend_domain;
+    
+    # Proxy para o frontend
+    location / {
+        proxy_pass http://localhost:$frontend_port/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+    }
+    
+    # Configurações para arquivos estáticos
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        proxy_pass http://localhost:$frontend_port;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
+EOF
+    
+    # Ativa a configuração
+    sudo ln -sf "$nginx_config" "/etc/nginx/sites-enabled/$stack_name-basic"
+    
+    # Testa e recarrega Nginx
+    if sudo nginx -t; then
+        sudo systemctl reload nginx
+        echo -e "${GREEN}✅ Configuração do Nginx ativada para domínios específicos${NC}"
+        echo -e "${YELLOW}🌐 URLs de acesso:${NC}"
+        echo -e "Backend:  ${GREEN}http://$backend_domain${NC}"
+        echo -e "Frontend: ${GREEN}http://$frontend_domain${NC}"
+        echo -e "${YELLOW}💡 Certifique-se de que os domínios apontam para este servidor${NC}"
+    else
+        echo -e "${RED}❌ Erro na configuração do Nginx${NC}"
+        return 1
+    fi
+}
+
+# Função para criar configuração do Nginx para localhost
+create_local_nginx_config() {
+    local stack_name=$1
+    local backend_port=$2
+    local frontend_port=$3
+    
+    local nginx_config="/etc/nginx/sites-available/$stack_name-basic"
+    
+    echo -e "${YELLOW}🏠 Configurando Nginx para localhost...${NC}"
+    
+    # Cria configuração básica (HTTP apenas) para localhost
+    sudo tee "$nginx_config" > /dev/null << EOF
+# Configuração básica Nginx para $stack_name (HTTP - localhost)
+# Esta configuração será usada temporariamente até configurar SSL
+
+# Servidor para backend
+server {
+    listen 80;
+    server_name _;
+    
+    # Proxy para o backend
+    location /api/ {
+        proxy_pass http://localhost:$backend_port/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_read_timeout 86400;
+    }
+    
+    # Proxy para o frontend
+    location / {
+        proxy_pass http://localhost:$frontend_port/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+    }
+    
+    # Configurações para WebSocket
+    location /socket.io/ {
+        proxy_pass http://localhost:$backend_port/socket.io/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+    
+    # Ativa a configuração
+    sudo ln -sf "$nginx_config" "/etc/nginx/sites-enabled/$stack_name-basic"
+    
+    # Testa e recarrega Nginx
+    if sudo nginx -t; then
+        sudo systemctl reload nginx
+        echo -e "${GREEN}✅ Configuração básica do Nginx ativada${NC}"
+        echo -e "${YELLOW}🌐 Acesse via HTTP: http://localhost${NC}"
+    else
+        echo -e "${RED}❌ Erro na configuração do Nginx${NC}"
+        return 1
+    fi
+}
+
+# Função para remover configuração básica do Nginx
+remove_basic_nginx_config() {
+    local stack_name=$1
+    
+    echo -e "${YELLOW}🗑️  Removendo configuração básica do Nginx para $stack_name...${NC}"
+    
+    local nginx_config="/etc/nginx/sites-available/$stack_name-basic"
+    local nginx_enabled="/etc/nginx/sites-enabled/$stack_name-basic"
+    
+    # Remove link simbólico
+    if [[ -L "$nginx_enabled" ]]; then
+        sudo rm "$nginx_enabled"
+        echo -e "${GREEN}✅ Site $stack_name-basic desativado no Nginx${NC}"
+    fi
+    
+    # Remove configuração
+    if [[ -f "$nginx_config" ]]; then
+        sudo rm "$nginx_config"
+        echo -e "${GREEN}✅ Configuração $stack_name-basic removida${NC}"
+    fi
+    
+    # Recarrega Nginx se ainda houver outras configurações
+    if [[ -d "/etc/nginx/sites-enabled" ]] && [[ -n "$(ls /etc/nginx/sites-enabled/ 2>/dev/null)" ]]; then
+        if sudo systemctl reload nginx; then
+            echo -e "${GREEN}✅ Nginx recarregado${NC}"
+        fi
+    fi
+}
+
 # Verifica se foi fornecido um comando
 if [[ $# -eq 0 ]]; then
     show_help
@@ -2001,6 +2365,20 @@ case "$1" in
         ;;
     "list-ssl")
         list_ssl
+        ;;
+    "setup-nginx")
+        shift  # Remove o comando "setup-nginx" dos argumentos
+        parse_args "$@"
+        
+        # Valida se o nome da stack foi fornecido
+        if [[ -z "$STACK_NAME" || "$STACK_NAME" == "codatende" ]]; then
+            echo -e "${RED}❌ Erro: Nome da stack é obrigatório para setup-nginx${NC}"
+            echo -e "${YELLOW}💡 Uso: ./manage-stacks.sh setup-nginx -n STACK_NAME${NC}"
+            echo -e "${YELLOW}💡 Exemplo: ./manage-stacks.sh setup-nginx -n codatende1${NC}"
+            exit 1
+        fi
+        
+        setup_nginx_and_certbot "$STACK_NAME" "true"
         ;;
     -h|--help)
         show_help
