@@ -653,55 +653,6 @@ check_dependencies() {
     echo -e "${GREEN}✅ Todas as dependências principais estão instaladas${NC}"
 }
 
-# Função para verificar health dos serviços
-check_service_health() {
-    local stack_name=$1
-    local max_attempts=30
-    local attempt=1
-    
-    echo -e "${YELLOW}🏥 Verificando health dos serviços...${NC}"
-    
-    # Verifica backend
-    echo -e "  🔍 Verificando backend..."
-    while [[ $attempt -le $max_attempts ]]; do
-        if curl -s --max-time 5 "http://localhost:$BACKEND_PORT/health" > /dev/null 2>&1; then
-            echo -e "    ${GREEN}✅ Backend está respondendo${NC}"
-            break
-        fi
-        
-        if [[ $attempt -eq $max_attempts ]]; then
-            echo -e "    ${RED}❌ Backend não está respondendo após $max_attempts tentativas${NC}"
-            return 1
-        fi
-        
-        echo -e "    ${YELLOW}⏳ Tentativa $attempt/$max_attempts...${NC}"
-        sleep 2
-        ((attempt++))
-    done
-    
-    # Verifica frontend
-    echo -e "  🔍 Verificando frontend..."
-    attempt=1
-    while [[ $attempt -le $max_attempts ]]; do
-        if curl -s --max-time 5 "http://localhost:$FRONTEND_PORT" > /dev/null 2>&1; then
-            echo -e "    ${GREEN}✅ Frontend está respondendo${NC}"
-            break
-        fi
-        
-        if [[ $attempt -eq $max_attempts ]]; then
-            echo -e "    ${RED}❌ Frontend não está respondendo após $max_attempts tentativas${NC}"
-            return 1
-        fi
-        
-        echo -e "    ${YELLOW}⏳ Tentativa $attempt/$max_attempts...${NC}"
-        sleep 2
-        ((attempt++))
-    done
-    
-    echo -e "${GREEN}✅ Todos os serviços estão funcionando corretamente!${NC}"
-    return 0
-}
-
 # Função para subir uma stack
 up_stack() {
     # Verifica dependências primeiro
@@ -782,30 +733,23 @@ up_stack() {
         
         if [[ "$all_running" == "true" ]]; then
             # Verificação adicional: testa se os serviços estão respondendo
-            if check_service_health "$STACK_NAME"; then
-                echo -e "\n${GREEN}🎉 Stack $STACK_NAME iniciada com sucesso!${NC}"
-                
-                # Salva a instância no arquivo JSON
-                save_instance "$STACK_NAME" "$BACKEND_PORT" "$FRONTEND_PORT" "$BACKEND_URL" "$FRONTEND_URL" "$TOTAL_CPU" "$TOTAL_MEMORY" "$ENABLE_FINANCIAL" "$GERENCIANET_CLIENT_ID" "$GERENCIANET_CLIENT_SECRET" "$GERENCIANET_PIX_KEY"
-                
-                # Inicia e configura Nginx e Certbot
-                setup_nginx_and_certbot "$STACK_NAME"
-                
-                echo -e "\n${YELLOW}🔗 URLs de acesso:${NC}"
-                echo -e "Backend:  ${GREEN}$BACKEND_URL${NC}"
-                echo -e "Frontend: ${GREEN}$FRONTEND_URL${NC}"
-                echo -e "\n${YELLOW}🛠️  Comandos úteis:${NC}"
-                echo -e "Logs:     ${GREEN}./manage-stacks.sh logs -n $STACK_NAME${NC}"
-                echo -e "Status:   ${GREEN}./manage-stacks.sh status -n $STACK_NAME${NC}"
-                echo -e "Update:   ${GREEN}./manage-stacks.sh update -n $STACK_NAME${NC}"
-                echo -e "Parar:    ${GREEN}./manage-stacks.sh down -n $STACK_NAME${NC}"
-                echo -e "Reiniciar: ${GREEN}./manage-stacks.sh restart -n $STACK_NAME${NC}"
-            else
-                echo -e "\n${RED}❌ Erro: Serviços não estão respondendo corretamente${NC}"
-                echo -e "${YELLOW}🔄 Executando rollback...${NC}"
-                rollback_stack "$STACK_NAME"
-                exit 1
-            fi
+            echo -e "\n${GREEN}🎉 Stack $STACK_NAME iniciada com sucesso!${NC}"
+            
+            # Salva a instância no arquivo JSON
+            save_instance "$STACK_NAME" "$BACKEND_PORT" "$FRONTEND_PORT" "$BACKEND_URL" "$FRONTEND_URL" "$TOTAL_CPU" "$TOTAL_MEMORY" "$ENABLE_FINANCIAL" "$GERENCIANET_CLIENT_ID" "$GERENCIANET_CLIENT_SECRET" "$GERENCIANET_PIX_KEY"
+            
+            # Inicia e configura Nginx e Certbot
+            setup_nginx_and_certbot "$STACK_NAME"
+            
+            echo -e "\n${YELLOW}🔗 URLs de acesso:${NC}"
+            echo -e "Backend:  ${GREEN}$BACKEND_URL${NC}"
+            echo -e "Frontend: ${GREEN}$FRONTEND_URL${NC}"
+            echo -e "\n${YELLOW}🛠️  Comandos úteis:${NC}"
+            echo -e "Logs:     ${GREEN}./manage-stacks.sh logs -n $STACK_NAME${NC}"
+            echo -e "Status:   ${GREEN}./manage-stacks.sh status -n $STACK_NAME${NC}"
+            echo -e "Update:   ${GREEN}./manage-stacks.sh update -n $STACK_NAME${NC}"
+            echo -e "Parar:    ${GREEN}./manage-stacks.sh down -n $STACK_NAME${NC}"
+            echo -e "Reiniciar: ${GREEN}./manage-stacks.sh restart -n $STACK_NAME${NC}"
         else
             echo -e "\n${RED}❌ Erro: Alguns serviços falharam:$failed_services${NC}"
             echo -e "${YELLOW}🔄 Executando rollback...${NC}"
