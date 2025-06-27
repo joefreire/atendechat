@@ -16,6 +16,7 @@ Quando você executa `./manage-stacks.sh up`, além de subir os containers Docke
 - ✅ **Configura renovação automática** de certificados SSL
 - ✅ **Cria configuração básica** do Nginx para proxy reverso
 - ✅ **Ativa a configuração** e recarrega o Nginx
+- ✅ **Configura SSL automaticamente** (se URLs são HTTPS)
 
 ### 2. Configuração Básica Criada
 
@@ -105,20 +106,30 @@ Após o `up`, você pode acessar:
 
 ## Configurando SSL/HTTPS
 
-Para configurar SSL com certificados Let's Encrypt:
+### SSL Automático
+
+O sistema configura automaticamente SSL quando você cria uma instância com URLs HTTPS:
+
+```bash
+# Criar instância com SSL automático
+./manage-stacks.sh up -n codatende1 -b 3000 -f 3001 -u https://api.seudominio.com -w https://app.seudominio.com
+```
+
+**O que acontece automaticamente:**
+1. ✅ **Nginx é configurado** para os domínios específicos
+2. ✅ **Certificados SSL são solicitados** via Certbot
+3. ✅ **Configurações HTTPS são criadas** e ativadas
+4. ✅ **Redirecionamento HTTP→HTTPS** é configurado
+5. ✅ **Stack fica disponível via HTTPS** imediatamente
+
+### SSL Manual
+
+Para configurar SSL manualmente ou para instâncias existentes:
 
 ```bash
 # Configure SSL para sua stack
 ./manage-stacks.sh ssl -n codatende1 -u https://api.seudominio.com -w https://app.seudominio.com
 ```
-
-### O que acontece durante o SSL:
-
-1. **Extrai domínios** das URLs fornecidas
-2. **Cria configurações separadas** para backend e frontend (se domínios diferentes)
-3. **Solicita certificados SSL** via Certbot
-4. **Configura Nginx** com HTTPS e redirecionamento HTTP→HTTPS
-5. **Ativa as configurações** e recarrega o Nginx
 
 ## Comando Setup-Nginx
 

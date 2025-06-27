@@ -1554,12 +1554,16 @@ setup_ssl() {
     local stack_name=$1
     local backend_url=$2
     local frontend_url=$3
+    local is_automatic=${4:-false}  # Se true, é chamada automaticamente
     
-    if [[ -z "$backend_url" || -z "$frontend_url" ]]; then
-        echo -e "${RED}❌ Erro: backend-url e frontend-url são obrigatórios${NC}"
-        echo -e "${YELLOW}💡 Uso: ./manage-stacks.sh ssl -n STACK_NAME -u BACKEND_URL -w FRONTEND_URL${NC}"
-        echo -e "${YELLOW}💡 Exemplo: ./manage-stacks.sh ssl -n codatende1 -u https://api.exemplo.com -w https://app.exemplo.com${NC}"
-        exit 1
+    # Se não for automático, valida se as URLs foram fornecidas
+    if [[ "$is_automatic" != "true" ]]; then
+        if [[ -z "$backend_url" || -z "$frontend_url" ]]; then
+            echo -e "${RED}❌ Erro: backend-url e frontend-url são obrigatórios${NC}"
+            echo -e "${YELLOW}💡 Uso: ./manage-stacks.sh ssl -n STACK_NAME -u BACKEND_URL -w FRONTEND_URL${NC}"
+            echo -e "${YELLOW}💡 Exemplo: ./manage-stacks.sh ssl -n codatende1 -u https://api.exemplo.com -w https://app.exemplo.com${NC}"
+            exit 1
+        fi
     fi
     
     # Valida se a instância existe
@@ -1592,14 +1596,30 @@ setup_ssl() {
     if [[ "$backend_domain" != "$frontend_domain" ]]; then
         echo -e "${YELLOW}🔐 Configurando SSL para backend ($backend_domain)...${NC}"
         create_nginx_config "$stack_name-backend" "$backend_domain" "$BACKEND_PORT" "backend"
-        setup_ssl_certificate "$backend_domain"
+        if ! setup_ssl_certificate "$backend_domain"; then
+            echo -e "${RED}❌ Erro ao configurar certificado para backend${NC}"
+            if [[ "$is_automatic" == "true" ]]; then
+                echo -e "${YELLOW}⚠️  SSL automático falhou, mas a stack continuará funcionando via HTTP${NC}"
+                return 1
+            else
+                exit 1
+            fi
+        fi
         enable_nginx_site "$stack_name-backend"
     fi
     
     # Configura SSL para frontend
     echo -e "${YELLOW}🔐 Configurando SSL para frontend ($frontend_domain)...${NC}"
     create_nginx_config "$stack_name-frontend" "$frontend_domain" "$FRONTEND_PORT" "frontend"
-    setup_ssl_certificate "$frontend_domain"
+    if ! setup_ssl_certificate "$frontend_domain"; then
+        echo -e "${RED}❌ Erro ao configurar certificado para frontend${NC}"
+        if [[ "$is_automatic" == "true" ]]; then
+            echo -e "${YELLOW}⚠️  SSL automático falhou, mas a stack continuará funcionando via HTTP${NC}"
+            return 1
+        else
+            exit 1
+        fi
+    fi
     enable_nginx_site "$stack_name-frontend"
     
     echo -e "${GREEN}✅ SSL configurado com sucesso!${NC}"
@@ -1753,8 +1773,14 @@ setup_ssl_certificate() {
     # Verifica se o certificado já existe
     if [[ -d "/etc/letsencrypt/live/$domain" ]]; then
         echo -e "${YELLOW}⚠️  Certificado já existe para $domain${NC}"
-        echo -e "${YELLOW}💡 Para renovar, use: certbot renew --cert-name $domain${NC}"
-        return 0
+        
+        # Verifica se o certificado é válido
+        if sudo certbot certificates --cert-name "$domain" 2>/dev/null | grep -q "VALID"; then
+            echo -e "${GREEN}✅ Certificado válido encontrado para $domain${NC}"
+            return 0
+        else
+            echo -e "${YELLOW}🔄 Certificado expirado, renovando...${NC}"
+        fi
     fi
     
     # Para o Nginx temporariamente para liberar porta 80
@@ -1768,8 +1794,9 @@ setup_ssl_certificate() {
     else
         echo -e "${RED}❌ Erro ao obter certificado SSL${NC}"
         echo -e "${YELLOW}💡 Verifique se o domínio está apontando para este servidor${NC}"
+        echo -e "${YELLOW}💡 Verifique se a porta 80 está livre${NC}"
         sudo systemctl start nginx
-        exit 1
+        return 1
     fi
     
     # Reinicia Nginx
@@ -2043,8 +2070,22 @@ setup_nginx_and_certbot() {
         echo -e "${YELLOW}🌐 URLs configuradas:${NC}"
         echo -e "Backend:  ${GREEN}$BACKEND_URL${NC}"
         echo -e "Frontend: ${GREEN}$FRONTEND_URL${NC}"
-        echo -e "${YELLOW}💡 Para configurar SSL/HTTPS, use:${NC}"
-        echo -e "  ${GREEN}./manage-stacks.sh ssl -n $stack_name -u $BACKEND_URL -w $FRONTEND_URL${NC}"
+        
+        # Configura SSL automaticamente se as URLs são HTTPS
+        if [[ "$BACKEND_URL" == https://* && "$FRONTEND_URL" == https://* ]]; then
+            echo -e "\n${YELLOW}🔐 Configurando SSL automaticamente...${NC}"
+            if setup_ssl "$stack_name" "$BACKEND_URL" "$FRONTEND_URL" "true"; then
+                echo -e "${GREEN}✅ SSL configurado automaticamente com sucesso!${NC}"
+            else
+                echo -e "${YELLOW}⚠️  SSL automático falhou, mas a stack continuará funcionando via HTTP${NC}"
+                echo -e "${YELLOW}💡 Para tentar configurar SSL manualmente:${NC}"
+                echo -e "  ${GREEN}./manage-stacks.sh ssl -n $stack_name -u $BACKEND_URL -w $FRONTEND_URL${NC}"
+            fi
+        else
+            echo -e "${YELLOW}💡 Para configurar SSL/HTTPS, use:${NC}"
+            echo -e "  ${GREEN}./manage-stacks.sh ssl -n $stack_name -u $BACKEND_URL -w $FRONTEND_URL${NC}"
+        fi
+        
         echo -e "${YELLOW}💡 Para ver configurações SSL ativas:${NC}"
         echo -e "  ${GREEN}./manage-stacks.sh list-ssl${NC}"
     else
