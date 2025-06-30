@@ -7,8 +7,7 @@ RUN npm install -g serve
 
 COPY frontend/package*.json ./
 COPY frontend/yarn.lock ./
-
-RUN yarn install
+COPY frontend/node_modules ./node_modules
 
 COPY frontend/ .
 
