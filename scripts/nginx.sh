@@ -201,69 +201,69 @@ server {
 }
 
 # Configuração HTTPS (será ativada após certificado SSL)
-server {
-    listen 443 ssl http2;
-    server_name $domain;
-    
-    # SSL será configurado pelo Certbot
-    # ssl_certificate /etc/letsencrypt/live/$domain/fullchain.pem;
-    # ssl_certificate_key /etc/letsencrypt/live/$domain/privkey.pem;
-    
-    # Logs
-    access_log /var/log/nginx/${stack_name}-backend-access.log;
-    error_log /var/log/nginx/${stack_name}-backend-error.log;
-    
-    # Configurações de segurança
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "no-referrer-when-downgrade" always;
-    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
-    
-    # Configurações de proxy
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade \$http_upgrade;
-    proxy_set_header Connection 'upgrade';
-    proxy_set_header Host \$host;
-    proxy_set_header X-Real-IP \$remote_addr;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto \$scheme;
-    proxy_cache_bypass \$http_upgrade;
-    
-    # Timeouts
-    proxy_connect_timeout 60s;
-    proxy_send_timeout 60s;
-    proxy_read_timeout 60s;
-    
-    # Buffer settings
-    proxy_buffering on;
-    proxy_buffer_size 4k;
-    proxy_buffers 8 4k;
-    
-    # Health check
-    location /health {
-        proxy_pass http://localhost:$port/health;
-        access_log off;
-    }
-    
-    # API routes
-    location /api/ {
-        proxy_pass http://localhost:$port/;
-    }
-    
-    # WebSocket support
-    location /socket.io/ {
-        proxy_pass http://localhost:$port/socket.io/;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-    
-    # Default location
-    location / {
-        proxy_pass http://localhost:$port/;
-    }
-}
+# server {
+#     listen 443 ssl http2;
+#     server_name $domain;
+#     
+#     # SSL será configurado pelo Certbot
+#     # ssl_certificate /etc/letsencrypt/live/$domain/fullchain.pem;
+#     # ssl_certificate_key /etc/letsencrypt/live/$domain/privkey.pem;
+#     
+#     # Logs
+#     access_log /var/log/nginx/${stack_name}-backend-access.log;
+#     error_log /var/log/nginx/${stack_name}-backend-error.log;
+#     
+#     # Configurações de segurança
+#     add_header X-Frame-Options "SAMEORIGIN" always;
+#     add_header X-XSS-Protection "1; mode=block" always;
+#     add_header X-Content-Type-Options "nosniff" always;
+#     add_header Referrer-Policy "no-referrer-when-downgrade" always;
+#     add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+#     
+#     # Configurações de proxy
+#     proxy_http_version 1.1;
+#     proxy_set_header Upgrade \$http_upgrade;
+#     proxy_set_header Connection 'upgrade';
+#     proxy_set_header Host \$host;
+#     proxy_set_header X-Real-IP \$remote_addr;
+#     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+#     proxy_set_header X-Forwarded-Proto \$scheme;
+#     proxy_cache_bypass \$http_upgrade;
+#     
+#     # Timeouts
+#     proxy_connect_timeout 60s;
+#     proxy_send_timeout 60s;
+#     proxy_read_timeout 60s;
+#     
+#     # Buffer settings
+#     proxy_buffering on;
+#     proxy_buffer_size 4k;
+#     proxy_buffers 8 4k;
+#     
+#     # Health check
+#     location /health {
+#         proxy_pass http://localhost:$port/health;
+#         access_log off;
+#     }
+#     
+#     # API routes
+#     location /api/ {
+#         proxy_pass http://localhost:$port/;
+#     }
+#     
+#     # WebSocket support
+#     location /socket.io/ {
+#         proxy_pass http://localhost:$port/socket.io/;
+#         proxy_http_version 1.1;
+#         proxy_set_header Upgrade \$http_upgrade;
+#         proxy_set_header Connection "upgrade";
+#     }
+#     
+#     # Default location
+#     location / {
+#         proxy_pass http://localhost:$port/;
+#     }
+# }
 EOF
     
     # Habilita o site
@@ -357,75 +357,75 @@ server {
 }
 
 # Configuração HTTPS (será ativada após certificado SSL)
-server {
-    listen 443 ssl http2;
-    server_name $domain;
-    
-    # SSL será configurado pelo Certbot
-    # ssl_certificate /etc/letsencrypt/live/$domain/fullchain.pem;
-    # ssl_certificate_key /etc/letsencrypt/live/$domain/privkey.pem;
-    
-    # Logs
-    access_log /var/log/nginx/${stack_name}-frontend-access.log;
-    error_log /var/log/nginx/${stack_name}-frontend-error.log;
-    
-    # Configurações de segurança
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "no-referrer-when-downgrade" always;
-    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
-    
-    # Configurações de proxy
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade \$http_upgrade;
-    proxy_set_header Connection 'upgrade';
-    proxy_set_header Host \$host;
-    proxy_set_header X-Real-IP \$remote_addr;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto \$scheme;
-    proxy_cache_bypass \$http_upgrade;
-    
-    # Timeouts
-    proxy_connect_timeout 60s;
-    proxy_send_timeout 60s;
-    proxy_read_timeout 60s;
-    
-    # Buffer settings
-    proxy_buffering on;
-    proxy_buffer_size 4k;
-    proxy_buffers 8 4k;
-    
-    # Gzip compression
-    gzip on;
-    gzip_vary on;
-    gzip_min_length 1024;
-    gzip_proxied any;
-    gzip_comp_level 6;
-    gzip_types
-        text/plain
-        text/css
-        text/xml
-        text/javascript
-        application/json
-        application/javascript
-        application/xml+rss
-        application/atom+xml
-        image/svg+xml;
-    
-    # Static files cache
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-        proxy_pass http://localhost:$port;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-    
-    # Default location (SPA support)
-    location / {
-        proxy_pass http://localhost:$port/;
-        try_files \$uri \$uri/ /index.html;
-    }
-}
+# server {
+#     listen 443 ssl http2;
+#     server_name $domain;
+#     
+#     # SSL será configurado pelo Certbot
+#     # ssl_certificate /etc/letsencrypt/live/$domain/fullchain.pem;
+#     # ssl_certificate_key /etc/letsencrypt/live/$domain/privkey.pem;
+#     
+#     # Logs
+#     access_log /var/log/nginx/${stack_name}-frontend-access.log;
+#     error_log /var/log/nginx/${stack_name}-frontend-error.log;
+#     
+#     # Configurações de segurança
+#     add_header X-Frame-Options "SAMEORIGIN" always;
+#     add_header X-XSS-Protection "1; mode=block" always;
+#     add_header X-Content-Type-Options "nosniff" always;
+#     add_header Referrer-Policy "no-referrer-when-downgrade" always;
+#     add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+#     
+#     # Configurações de proxy
+#     proxy_http_version 1.1;
+#     proxy_set_header Upgrade \$http_upgrade;
+#     proxy_set_header Connection 'upgrade';
+#     proxy_set_header Host \$host;
+#     proxy_set_header X-Real-IP \$remote_addr;
+#     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+#     proxy_set_header X-Forwarded-Proto \$scheme;
+#     proxy_cache_bypass \$http_upgrade;
+#     
+#     # Timeouts
+#     proxy_connect_timeout 60s;
+#     proxy_send_timeout 60s;
+#     proxy_read_timeout 60s;
+#     
+#     # Buffer settings
+#     proxy_buffering on;
+#     proxy_buffer_size 4k;
+#     proxy_buffers 8 4k;
+#     
+#     # Gzip compression
+#     gzip on;
+#     gzip_vary on;
+#     gzip_min_length 1024;
+#     gzip_proxied any;
+#     gzip_comp_level 6;
+#     gzip_types
+#         text/plain
+#         text/css
+#         text/xml
+#         text/javascript
+#         application/json
+#         application/javascript
+#         application/xml+rss
+#         application/atom+xml
+#         image/svg+xml;
+#     
+#     # Static files cache
+#     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+#         proxy_pass http://localhost:$port;
+#         expires 1y;
+#         add_header Cache-Control "public, immutable";
+#     }
+#     
+#     # Default location (SPA support)
+#     location / {
+#         proxy_pass http://localhost:$port/;
+#         try_files \$uri \$uri/ /index.html;
+#     }
+# }
 EOF
     
     # Habilita o site
@@ -537,22 +537,88 @@ update_nginx_ssl_config() {
         return 1
     fi
     
+    # Descomenta a seção HTTPS inteira
+    sudo sed -i 's/^# server {/server {/g' "$config_file"
+    sudo sed -i 's/^#     listen 443 ssl http2;/    listen 443 ssl http2;/g' "$config_file"
+    sudo sed -i 's/^#     server_name/    server_name/g' "$config_file"
+    sudo sed -i 's/^#     # SSL será configurado pelo Certbot/    # SSL será configurado pelo Certbot/g' "$config_file"
+    sudo sed -i 's/^#     # ssl_certificate/    ssl_certificate/g' "$config_file"
+    sudo sed -i 's/^#     # ssl_certificate_key/    ssl_certificate_key/g' "$config_file"
+    sudo sed -i 's/^#     # Logs/    # Logs/g' "$config_file"
+    sudo sed -i 's/^#     access_log/    access_log/g' "$config_file"
+    sudo sed -i 's/^#     error_log/    error_log/g' "$config_file"
+    sudo sed -i 's/^#     # Configurações de segurança/    # Configurações de segurança/g' "$config_file"
+    sudo sed -i 's/^#     add_header/    add_header/g' "$config_file"
+    sudo sed -i 's/^#     # Configurações de proxy/    # Configurações de proxy/g' "$config_file"
+    sudo sed -i 's/^#     proxy_/    proxy_/g' "$config_file"
+    sudo sed -i 's/^#     # Timeouts/    # Timeouts/g' "$config_file"
+    sudo sed -i 's/^#     proxy_connect_timeout/    proxy_connect_timeout/g' "$config_file"
+    sudo sed -i 's/^#     proxy_send_timeout/    proxy_send_timeout/g' "$config_file"
+    sudo sed -i 's/^#     proxy_read_timeout/    proxy_read_timeout/g' "$config_file"
+    sudo sed -i 's/^#     # Buffer settings/    # Buffer settings/g' "$config_file"
+    sudo sed -i 's/^#     proxy_buffering/    proxy_buffering/g' "$config_file"
+    sudo sed -i 's/^#     proxy_buffer_size/    proxy_buffer_size/g' "$config_file"
+    sudo sed -i 's/^#     proxy_buffers/    proxy_buffers/g' "$config_file"
+    
+    # Descomenta seções específicas baseadas no tipo de configuração
+    if [[ "$config_name" == *"backend"* ]]; then
+        sudo sed -i 's/^#     # Health check/    # Health check/g' "$config_file"
+        sudo sed -i 's/^#     location \/health {/    location \/health {/g' "$config_file"
+        sudo sed -i 's/^#         proxy_pass/        proxy_pass/g' "$config_file"
+        sudo sed -i 's/^#         access_log off;/        access_log off;/g' "$config_file"
+        sudo sed -i 's/^#     }/    }/g' "$config_file"
+        sudo sed -i 's/^#     # API routes/    # API routes/g' "$config_file"
+        sudo sed -i 's/^#     location \/api\/ {/    location \/api\/ {/g' "$config_file"
+        sudo sed -i 's/^#         proxy_pass/        proxy_pass/g' "$config_file"
+        sudo sed -i 's/^#     }/    }/g' "$config_file"
+        sudo sed -i 's/^#     # WebSocket support/    # WebSocket support/g' "$config_file"
+        sudo sed -i 's/^#     location \/socket.io\/ {/    location \/socket.io\/ {/g' "$config_file"
+        sudo sed -i 's/^#         proxy_pass/        proxy_pass/g' "$config_file"
+        sudo sed -i 's/^#         proxy_http_version/        proxy_http_version/g' "$config_file"
+        sudo sed -i 's/^#         proxy_set_header Upgrade/        proxy_set_header Upgrade/g' "$config_file"
+        sudo sed -i 's/^#         proxy_set_header Connection/        proxy_set_header Connection/g' "$config_file"
+        sudo sed -i 's/^#     }/    }/g' "$config_file"
+        sudo sed -i 's/^#     # Default location/    # Default location/g' "$config_file"
+        sudo sed -i 's/^#     location \/ {/    location \/ {/g' "$config_file"
+        sudo sed -i 's/^#         proxy_pass/        proxy_pass/g' "$config_file"
+        sudo sed -i 's/^#     }/    }/g' "$config_file"
+    else
+        # Frontend - descomenta seções específicas do frontend
+        sudo sed -i 's/^#     # Gzip compression/    # Gzip compression/g' "$config_file"
+        sudo sed -i 's/^#     gzip/    gzip/g' "$config_file"
+        sudo sed -i 's/^#     # Static files cache/    # Static files cache/g' "$config_file"
+        sudo sed -i 's/^#     location ~\* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)\$ {/    location ~\* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)\$ {/g' "$config_file"
+        sudo sed -i 's/^#         proxy_pass/        proxy_pass/g' "$config_file"
+        sudo sed -i 's/^#         expires/        expires/g' "$config_file"
+        sudo sed -i 's/^#         add_header Cache-Control/        add_header Cache-Control/g' "$config_file"
+        sudo sed -i 's/^#     }/    }/g' "$config_file"
+        sudo sed -i 's/^#     # Default location (SPA support)/    # Default location (SPA support)/g' "$config_file"
+        sudo sed -i 's/^#     location \/ {/    location \/ {/g' "$config_file"
+        sudo sed -i 's/^#         proxy_pass/        proxy_pass/g' "$config_file"
+        sudo sed -i 's/^#         try_files/        try_files/g' "$config_file"
+        sudo sed -i 's/^#     }/    }/g' "$config_file"
+    fi
+    
+    # Descomenta o fechamento do server block
+    sudo sed -i 's/^# }/}/g' "$config_file"
+    
     # Atualiza configuração com certificados SSL
     sudo sed -i "s|# ssl_certificate /etc/letsencrypt/live/$domain/fullchain.pem;|ssl_certificate /etc/letsencrypt/live/$domain/fullchain.pem;|g" "$config_file"
     sudo sed -i "s|# ssl_certificate_key /etc/letsencrypt/live/$domain/privkey.pem;|ssl_certificate_key /etc/letsencrypt/live/$domain/privkey.pem;|g" "$config_file"
     
-    # Adiciona configurações SSL modernas
-    sudo sed -i '/ssl_certificate_key/a\
-    # SSL Configuration\
-    ssl_protocols TLSv1.2 TLSv1.3;\
-    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384;\
-    ssl_prefer_server_ciphers off;\
-    ssl_session_cache shared:SSL:10m;\
-    ssl_session_timeout 10m;\
-    ssl_stapling on;\
-    ssl_stapling_verify on;\
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;\
-    ' "$config_file"
+    # Adiciona configurações SSL modernas após a linha ssl_certificate_key
+    sudo sed -i "/ssl_certificate_key/a\\
+    \\
+    # SSL Configuration\\
+    ssl_protocols TLSv1.2 TLSv1.3;\\
+    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384;\\
+    ssl_prefer_server_ciphers off;\\
+    ssl_session_cache shared:SSL:10m;\\
+    ssl_session_timeout 10m;\\
+    ssl_stapling on;\\
+    ssl_stapling_verify on;\\
+    add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains\" always;\\
+    " "$config_file"
     
     echo -e "    ${GREEN}✅ Configuração SSL atualizada para $domain${NC}"
 }
