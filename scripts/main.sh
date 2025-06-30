@@ -19,6 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/instances.sh"
 source "$SCRIPT_DIR/stacks.sh"
+source "$SCRIPT_DIR/nginx.sh"
 
 # Função para mostrar ajuda
 show_help() {
@@ -41,6 +42,8 @@ show_help() {
     echo -e "  📝 logs      - Mostra logs de uma stack"
     echo -e "  📈 status    - Mostra status de uma stack"
     echo -e "  🔄 restart   - Reinicia uma stack"
+    echo -e "  🌐 nginx     - Gerencia configurações do Nginx"
+    echo -e "  🔐 ssl       - Gerencia certificados SSL"
     echo -e "\n${GREEN}⚙️  Opções para 'up':${NC}"
     echo -e "  -n, --name STACK_NAME     Nome da stack (padrão: codatende)"
     echo -e "  -b, --backend-port PORT   Porta do backend (padrão: 3000)"
@@ -249,6 +252,43 @@ case "$1" in
         shift  # Remove o comando "restart" dos argumentos
         parse_args "$@"
         restart_stack
+        ;;
+    "nginx")
+        shift  # Remove o comando "nginx" dos argumentos
+        case "$1" in
+            "status")
+                check_nginx_status
+                ;;
+            "list")
+                list_nginx_configs
+                ;;
+            "reload")
+                if sudo nginx -t; then
+                    sudo systemctl reload nginx 2>/dev/null || sudo service nginx reload 2>/dev/null
+                    echo -e "${GREEN}✅ Nginx recarregado${NC}"
+                else
+                    echo -e "${RED}❌ Configuração do Nginx inválida${NC}"
+                fi
+                ;;
+            *)
+                echo -e "${YELLOW}🌐 Comandos do Nginx:${NC}"
+                echo -e "  status  - Verifica status do Nginx"
+                echo -e "  list    - Lista configurações"
+                echo -e "  reload  - Recarrega configuração"
+                ;;
+        esac
+        ;;
+    "ssl")
+        shift  # Remove o comando "ssl" dos argumentos
+        case "$1" in
+            "renew")
+                renew_ssl_certificates
+                ;;
+            *)
+                echo -e "${YELLOW}🔐 Comandos SSL:${NC}"
+                echo -e "  renew   - Renova certificados SSL"
+                ;;
+        esac
         ;;
     -h|--help)
         show_help

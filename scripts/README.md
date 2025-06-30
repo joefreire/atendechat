@@ -6,11 +6,13 @@ Este diretório contém a versão modular do gerenciador de stacks Docker, divid
 
 ```
 scripts/
-├── main.sh          # Script principal com menu e parsing de argumentos
-├── utils.sh         # Funções utilitárias (cores, validações, dependências)
-├── instances.sh     # Gerenciamento de instâncias (JSON)
-├── stacks.sh        # Funções de gerenciamento de stacks Docker
-└── README.md        # Esta documentação
+├── main.sh              # Script principal com menu e parsing de argumentos
+├── utils.sh             # Funções utilitárias (cores, validações, dependências)
+├── instances.sh         # Gerenciamento de instâncias (JSON)
+├── stacks.sh            # Funções de gerenciamento de stacks Docker
+├── nginx.sh             # Gerenciamento de Nginx e certificados SSL
+├── install-nginx.sh     # Script de instalação do Nginx e Certbot
+└── README.md            # Esta documentação
 ```
 
 ## 🔧 Arquivos
@@ -49,21 +51,63 @@ scripts/
 - **Função**: Operações com stacks Docker
 - **Conteúdo**:
   - `rollback_stack()` - Rollback em caso de erro
-  - `up_stack()` - Inicia nova stack
-  - `down_stack()` - Para stack
+  - `up_stack()` - Inicia nova stack (inclui configuração Nginx)
+  - `down_stack()` - Para stack (remove configurações Nginx)
   - `list_stacks()` - Lista stacks Docker
   - `logs_stack()` - Mostra logs
   - `status_stack()` - Mostra status
   - `restart_stack()` - Reinicia stack
   - `update_stack()` - Atualiza imagens Docker
 
+### `nginx.sh`
+- **Função**: Gerenciamento de Nginx e certificados SSL
+- **Conteúdo**:
+  - `check_nginx_installed()` - Verifica instalação do Nginx/Certbot
+  - `extract_domain()` - Extrai domínio de URLs
+  - `validate_domain()` - Valida domínios para SSL
+  - `create_nginx_config()` - Cria configurações de proxy reverso
+  - `generate_ssl_certificates()` - Gera certificados SSL via Certbot
+  - `remove_nginx_config()` - Remove configurações do Nginx
+  - `renew_ssl_certificates()` - Renova certificados SSL
+  - `list_nginx_configs()` - Lista configurações do Nginx
+  - `check_nginx_status()` - Verifica status do Nginx
+
+### `install-nginx.sh`
+- **Função**: Script de instalação automática do Nginx e Certbot
+- **Conteúdo**:
+  - Detecção automática do sistema operacional
+  - Instalação para Ubuntu/Debian, CentOS/RHEL e macOS
+  - Configuração automática do Nginx
+  - Configuração do Certbot com renovação automática
+  - Configuração de firewall
+
 ## 🚀 Como Usar
+
+### Instalação do Nginx e Certbot (Primeira vez)
+```bash
+# Instala Nginx e Certbot automaticamente
+./scripts/install-nginx.sh
+```
 
 ### Script Wrapper (Recomendado)
 ```bash
-./manage-stacks-new.sh up -n codatende1 -b 3000 -f 3001
-./manage-stacks-new.sh instances
-./manage-stacks-new.sh --help
+# Criar instância com domínios (SSL automático)
+./manage-stacks.sh up -n codatende1 -u https://api.exemplo.com -w https://app.exemplo.com
+
+# Criar instância local (sem SSL)
+./manage-stacks.sh up -n codatende1 -b 3000 -f 3001
+
+# Gerenciar Nginx
+./manage-stacks.sh nginx status
+./manage-stacks.sh nginx list
+./manage-stacks.sh nginx reload
+
+# Gerenciar SSL
+./manage-stacks.sh ssl renew
+
+# Outros comandos
+./manage-stacks.sh instances
+./manage-stacks.sh --help
 ```
 
 ### Script Principal Direto
@@ -114,9 +158,53 @@ list_instances
 
 ## 📋 Dependências
 
-Os scripts mantêm as mesmas dependências do original:
+### Dependências Básicas
 - Docker
 - Docker Compose
 - jq (opcional, mas recomendado)
 - bc (para cálculos)
-- curl (para health checks) 
+- curl (para health checks)
+
+### Dependências para Nginx e SSL (Opcional)
+- Nginx (instalado via `install-nginx.sh`)
+- Certbot (instalado via `install-nginx.sh`)
+
+## 🌐 Funcionalidades de Nginx e SSL
+
+### Configuração Automática
+- ✅ Criação automática de virtual hosts
+- ✅ Proxy reverso para backend e frontend
+- ✅ Geração automática de certificados SSL
+- ✅ Configurações de segurança modernas
+- ✅ Suporte a WebSocket
+- ✅ Compressão Gzip
+- ✅ Cache de arquivos estáticos
+
+### Comandos de Gerenciamento
+```bash
+# Verificar status do Nginx
+./manage-stacks.sh nginx status
+
+# Listar configurações
+./manage-stacks.sh nginx list
+
+# Recarregar configuração
+./manage-stacks.sh nginx reload
+
+# Renovar certificados SSL
+./manage-stacks.sh ssl renew
+```
+
+### Exemplo de Uso com Domínios
+```bash
+# Criar instância com domínios (SSL automático)
+./manage-stacks.sh up -n codatende1 \
+  -u https://api.exemplo.com \
+  -w https://app.exemplo.com
+
+# O sistema irá:
+# 1. Criar configurações do Nginx
+# 2. Gerar certificados SSL via Certbot
+# 3. Configurar proxy reverso
+# 4. Aplicar configurações de segurança
+``` 

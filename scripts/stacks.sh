@@ -47,6 +47,10 @@ rollback_stack() {
     echo -e "  🖼️  Removendo imagens órfãs..."
     docker image prune -f 2>/dev/null
     
+    # Remove configurações do Nginx se existirem
+    echo -e "  🌐 Removendo configurações do Nginx..."
+    remove_nginx_config "$stack_name" 2>/dev/null || true
+    
     # Remove a instância do arquivo JSON se existir
     if command -v jq &> /dev/null; then
         local exists=$(jq -r ".instances[\"$stack_name\"]" "$INSTANCES_FILE" 2>/dev/null)
@@ -143,6 +147,21 @@ up_stack() {
             if check_service_health "$STACK_NAME"; then
                 echo -e "\n${GREEN}🎉 Stack $STACK_NAME iniciada com sucesso!${NC}"
                 
+                # Configura Nginx e gera certificados SSL
+                echo -e "\n${YELLOW}🌐 Configurando Nginx e certificados SSL...${NC}"
+                if create_nginx_config "$STACK_NAME" "$BACKEND_URL" "$FRONTEND_URL" "$BACKEND_PORT" "$FRONTEND_PORT"; then
+                    echo -e "${GREEN}✅ Configuração do Nginx criada${NC}"
+                    
+                    # Gera certificados SSL (apenas para domínios válidos)
+                    if generate_ssl_certificates "$STACK_NAME" "$BACKEND_URL" "$FRONTEND_URL"; then
+                        echo -e "${GREEN}✅ Certificados SSL configurados${NC}"
+                    else
+                        echo -e "${YELLOW}⚠️  Certificados SSL não puderam ser gerados (domínios locais ou DNS não configurado)${NC}"
+                    fi
+                else
+                    echo -e "${YELLOW}⚠️  Configuração do Nginx falhou (Nginx pode não estar instalado)${NC}"
+                fi
+                
                 # Salva a instância no arquivo JSON
                 save_instance "$STACK_NAME" "$BACKEND_PORT" "$FRONTEND_PORT" "$BACKEND_URL" "$FRONTEND_URL" "$TOTAL_CPU" "$TOTAL_MEMORY" "$ENABLE_FINANCIAL" "$GERENCIANET_CLIENT_ID" "$GERENCIANET_CLIENT_SECRET" "$GERENCIANET_PIX_KEY"
                 
@@ -192,6 +211,14 @@ down_stack() {
     docker_compose_exec $STACK_NAME down
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✅ Stack $STACK_NAME parada com sucesso!${NC}"
+        
+        # Remove configurações do Nginx
+        echo -e "${YELLOW}🧹 Removendo configurações do Nginx...${NC}"
+        if remove_nginx_config "$STACK_NAME"; then
+            echo -e "${GREEN}✅ Configurações do Nginx removidas${NC}"
+        else
+            echo -e "${YELLOW}⚠️  Erro ao remover configurações do Nginx${NC}"
+        fi
         
         # Remove a instância do arquivo JSON
         remove_instance "$STACK_NAME"
