@@ -154,7 +154,7 @@ configure_nginx() {
     if [[ ! -f "$nginx_conf" ]]; then
         echo -e "  📝 Criando configuração principal do Nginx..."
         sudo tee "$nginx_conf" > /dev/null <<EOF
-user nginx;
+user www-data;
 worker_processes auto;
 error_log /var/log/nginx/error.log;
 pid /run/nginx.pid;
