@@ -91,8 +91,15 @@ sudo certbot certificates
 ### Remoção
 
 ```bash
-# Parar e remover stack (inclui limpeza do Nginx)
+# Parar e remover stack (inclui limpeza completa)
 ./manage-stacks.sh down -n codatende1
+
+# O sistema irá:
+# 1. Parar todos os containers Docker
+# 2. Remover configurações do Nginx
+# 3. Remover certificados SSL
+# 4. Remover instância do arquivo JSON
+# 5. Recarregar Nginx
 ```
 
 ## 🌐 Configurações do Nginx Criadas

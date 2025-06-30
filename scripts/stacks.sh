@@ -47,8 +47,8 @@ rollback_stack() {
     echo -e "  🖼️  Removendo imagens órfãs..."
     docker image prune -f 2>/dev/null
     
-    # Remove configurações do Nginx se existirem
-    echo -e "  🌐 Removendo configurações do Nginx..."
+    # Remove configurações do Nginx e certificados SSL se existirem
+    echo -e "  🌐 Removendo configurações do Nginx e certificados SSL..."
     remove_nginx_config "$stack_name" 2>/dev/null || true
     
     # Remove a instância do arquivo JSON se existir

@@ -284,9 +284,18 @@ case "$1" in
             "renew")
                 renew_ssl_certificates
                 ;;
+            "list")
+                echo -e "${YELLOW}📋 Certificados SSL:${NC}"
+                if command -v certbot &> /dev/null; then
+                    sudo certbot certificates
+                else
+                    echo -e "  ${RED}❌ Certbot não está instalado${NC}"
+                fi
+                ;;
             *)
                 echo -e "${YELLOW}🔐 Comandos SSL:${NC}"
                 echo -e "  renew   - Renova certificados SSL"
+                echo -e "  list    - Lista certificados SSL"
                 ;;
         esac
         ;;

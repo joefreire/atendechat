@@ -632,15 +632,29 @@ remove_nginx_config() {
     # Remove configurações do backend
     local backend_config="$NGINX_CONF_DIR/${stack_name}-backend"
     if [[ -f "$backend_config" ]]; then
+        # Extrai domínio da configuração antes de remover
+        local backend_domain=$(grep "server_name" "$backend_config" | head -1 | awk '{print $2}' | sed 's/;$//')
         sudo rm -f "$backend_config"
         echo -e "  🗑️  Removida configuração do backend: $backend_config"
+        
+        # Remove certificado SSL se existir
+        if [[ -n "$backend_domain" && "$backend_domain" != "localhost" ]]; then
+            remove_ssl_certificate "$backend_domain"
+        fi
     fi
     
     # Remove configurações do frontend
     local frontend_config="$NGINX_CONF_DIR/${stack_name}-frontend"
     if [[ -f "$frontend_config" ]]; then
+        # Extrai domínio da configuração antes de remover
+        local frontend_domain=$(grep "server_name" "$frontend_config" | head -1 | awk '{print $2}' | sed 's/;$//')
         sudo rm -f "$frontend_config"
         echo -e "  🗑️  Removida configuração do frontend: $frontend_config"
+        
+        # Remove certificado SSL se existir
+        if [[ -n "$frontend_domain" && "$frontend_domain" != "localhost" ]]; then
+            remove_ssl_certificate "$frontend_domain"
+        fi
     fi
     
     # Remove links simbólicos
@@ -659,6 +673,34 @@ remove_nginx_config() {
     fi
     
     echo -e "${GREEN}✅ Configurações do Nginx removidas para $stack_name${NC}"
+}
+
+# Função para remover certificado SSL
+remove_ssl_certificate() {
+    local domain=$1
+    
+    if [[ -z "$domain" ]]; then
+        return 0
+    fi
+    
+    echo -e "  🔐 Removendo certificado SSL para $domain..."
+    
+    # Verifica se o certificado existe
+    if [[ -d "$CERTBOT_CONF_DIR/live/$domain" ]]; then
+        # Remove certificado via Certbot
+        if sudo certbot delete --cert-name "$domain" --non-interactive; then
+            echo -e "    ${GREEN}✅ Certificado SSL removido para $domain${NC}"
+        else
+            echo -e "    ${YELLOW}⚠️  Erro ao remover certificado via Certbot, removendo manualmente${NC}"
+            # Remove manualmente se o Certbot falhar
+            sudo rm -rf "$CERTBOT_CONF_DIR/live/$domain"
+            sudo rm -rf "$CERTBOT_CONF_DIR/archive/$domain"
+            sudo rm -rf "$CERTBOT_CONF_DIR/renewal/$domain.conf"
+            echo -e "    ${GREEN}✅ Certificado SSL removido manualmente para $domain${NC}"
+        fi
+    else
+        echo -e "    ${YELLOW}⚠️  Certificado SSL não encontrado para $domain${NC}"
+    fi
 }
 
 # Função para renovar certificados SSL

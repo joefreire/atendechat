@@ -175,6 +175,7 @@ list_instances
 - ✅ Criação automática de virtual hosts
 - ✅ Proxy reverso para backend e frontend
 - ✅ Geração automática de certificados SSL
+- ✅ Remoção automática de configurações e certificados
 - ✅ Configurações de segurança modernas
 - ✅ Suporte a WebSocket
 - ✅ Compressão Gzip
@@ -193,6 +194,9 @@ list_instances
 
 # Renovar certificados SSL
 ./manage-stacks.sh ssl renew
+
+# Listar certificados SSL
+./manage-stacks.sh ssl list
 ```
 
 ### Exemplo de Uso com Domínios
