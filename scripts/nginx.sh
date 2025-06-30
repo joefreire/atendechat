@@ -342,17 +342,17 @@ server {
         application/atom+xml
         image/svg+xml;
     
-    # Static files cache
+    # Default location (SPA support) - deve vir primeiro
+    location / {
+        proxy_pass http://localhost:$port/;
+        try_files \$uri \$uri/ /index.html;
+    }
+    
+    # Static files cache - deve vir depois da location principal
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
         proxy_pass http://localhost:$port;
         expires 1y;
         add_header Cache-Control "public, immutable";
-    }
-    
-    # Default location (SPA support)
-    location / {
-        proxy_pass http://localhost:$port/;
-        try_files \$uri \$uri/ /index.html;
     }
 }
 
@@ -413,17 +413,17 @@ server {
 #         application/atom+xml
 #         image/svg+xml;
 #     
-#     # Static files cache
+#     # Default location (SPA support) - deve vir primeiro
+#     location / {
+#         proxy_pass http://localhost:$port/;
+#         try_files \$uri \$uri/ /index.html;
+#     }
+#     
+#     # Static files cache - deve vir depois da location principal
 #     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
 #         proxy_pass http://localhost:$port;
 #         expires 1y;
 #         add_header Cache-Control "public, immutable";
-#     }
-#     
-#     # Default location (SPA support)
-#     location / {
-#         proxy_pass http://localhost:$port/;
-#         try_files \$uri \$uri/ /index.html;
 #     }
 # }
 EOF
@@ -570,12 +570,12 @@ update_nginx_ssl_config() {
         # Frontend - descomenta seções específicas do frontend
         sudo sed -i 's/^#     # Gzip compression/    # Gzip compression/g' "$config_file"
         sudo sed -i 's/^#     gzip/    gzip/g' "$config_file"
-        sudo sed -i 's/^#     # Default location (SPA support)/    # Default location (SPA support)/g' "$config_file"
+        sudo sed -i 's/^#     # Default location (SPA support) - deve vir primeiro/    # Default location (SPA support) - deve vir primeiro/g' "$config_file"
         sudo sed -i 's/^#     location \/ {/    location \/ {/g' "$config_file"
         sudo sed -i 's/^#         proxy_pass/        proxy_pass/g' "$config_file"
         sudo sed -i 's/^#         try_files/        try_files/g' "$config_file"
         sudo sed -i 's/^#     }/    }/g' "$config_file"
-        sudo sed -i 's/^#     # Static files cache/    # Static files cache/g' "$config_file"
+        sudo sed -i 's/^#     # Static files cache - deve vir depois da location principal/    # Static files cache - deve vir depois da location principal/g' "$config_file"
         sudo sed -i 's/^#     location ~\* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)\$ {/    location ~\* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)\$ {/g' "$config_file"
         sudo sed -i 's/^#         proxy_pass/        proxy_pass/g' "$config_file"
         sudo sed -i 's/^#         expires/        expires/g' "$config_file"
