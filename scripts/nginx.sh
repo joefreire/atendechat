@@ -480,49 +480,38 @@ generate_ssl_certificates() {
 generate_certificate_for_domain() {
     local domain=$1
     local config_name=$2
-    
+
     # Verifica se o certificado já existe
     if [[ -d "$CERTBOT_CONF_DIR/live/$domain" ]]; then
         echo -e "    ${YELLOW}⚠️  Certificado já existe para $domain${NC}"
         return 0
     fi
-    
+
     # Verifica se o domínio está resolvendo
     if ! nslookup "$domain" > /dev/null 2>&1; then
         echo -e "    ${RED}❌ Domínio $domain não está resolvendo!${NC}"
         echo -e "    ${YELLOW}💡 Configure o DNS para apontar para este servidor${NC}"
         return 1
     fi
-    
+
     # Gera certificado usando webroot
     echo -e "    🔐 Solicitando certificado para $domain..."
-    
-    # Cria arquivo de configuração temporário para o Certbot
-    local certbot_config="/tmp/certbot-${domain}.conf"
-    sudo tee "$certbot_config" > /dev/null <<EOF
-# Configuração do Certbot para $domain
-authenticator = webroot
-webroot-path = $CERTBOT_WEBROOT
-domains = $domain
-email = admin@$domain
-agree-tos = True
-non-interactive = True
-EOF
-    
-    # Executa Certbot
-    if sudo certbot certonly --config "$certbot_config" --webroot --webroot-path="$CERTBOT_WEBROOT" --domains="$domain" --non-interactive --agree-tos --email="admin@$domain"; then
+
+    if sudo certbot certonly \
+        --webroot \
+        --webroot-path "$CERTBOT_WEBROOT" \
+        --domain "$domain" \
+        --non-interactive \
+        --agree-tos \
+        --email "admin@$domain"; then
+
         echo -e "    ${GREEN}✅ Certificado gerado para $domain${NC}"
-        
-        # Atualiza configuração do Nginx com certificados SSL
         update_nginx_ssl_config "$domain" "$config_name"
     else
         echo -e "    ${RED}❌ Erro ao gerar certificado para $domain${NC}"
-        echo -e "    ${YELLOW}💡 Verifique se o domínio está apontando para este servidor${NC}"
+        echo -e "    ${YELLOW}💡 Verifique se o domínio está apontando para este servidor e se a porta 80 está aberta${NC}"
         return 1
     fi
-    
-    # Remove arquivo temporário
-    sudo rm -f "$certbot_config"
 }
 
 # Função para atualizar configuração do Nginx com certificados SSL
