@@ -8,9 +8,6 @@ RUN npm install -g serve
 COPY frontend/package*.json ./
 COPY frontend/yarn.lock ./
 COPY frontend/node_modules ./node_modules
-
-# RUN yarn install
-
 COPY frontend/ .
 
 RUN rm -f .env 

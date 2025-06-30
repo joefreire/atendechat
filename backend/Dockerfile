@@ -11,13 +11,12 @@ RUN rm -f package-lock.json
 COPY backend/package*.json ./
 COPY backend/yarn.lock ./
 COPY backend/node_modules ./node_modules
+COPY backend/ .
 
 # Configure git to use HTTPS instead of SSH
 RUN git config --global url."https://".insteadOf ssh://
 
-# RUN yarn install
-
-COPY backend/ .
+RUN yarn add fluent-ffmpeg @ffmpeg-installer/ffmpeg
 
 COPY certificates ./certs-temp
 
