@@ -19,7 +19,6 @@ NGINX_CONF_DIR="/etc/nginx/sites-available"
 NGINX_ENABLED_DIR="/etc/nginx/sites-enabled"
 NGINX_SSL_DIR="/etc/nginx/ssl"
 CERTBOT_CONF_DIR="/etc/letsencrypt"
-CERTBOT_WEBROOT="/var/www/html"
 
 # Função para verificar se o Nginx está instalado
 check_nginx_installed() {
@@ -454,8 +453,7 @@ generate_ssl_certificates() {
         return 1
     fi
     
-    # Cria diretório webroot se não existir
-    sudo mkdir -p "$CERTBOT_WEBROOT"
+    # O plugin nginx do Certbot não precisa de webroot
     
     # Gera certificado para o backend
     if [[ "$backend_domain" != "localhost" ]] && [[ ! "$backend_domain" =~ ^127\. ]] && [[ ! "$backend_domain" =~ ^192\.168\. ]] && [[ ! "$backend_domain" =~ ^10\. ]]; then
@@ -469,11 +467,8 @@ generate_ssl_certificates() {
         generate_certificate_for_domain "$frontend_domain" "$stack_name-frontend"
     fi
     
-    # Recarrega Nginx para aplicar certificados
-    if sudo nginx -t; then
-        sudo systemctl reload nginx 2>/dev/null || sudo service nginx reload 2>/dev/null
-        echo -e "${GREEN}✅ Nginx recarregado com certificados SSL${NC}"
-    fi
+    # O plugin nginx do Certbot recarrega automaticamente o Nginx
+    echo -e "${GREEN}✅ Certificados SSL gerados e Nginx configurado automaticamente${NC}"
 }
 
 # Função para gerar certificado para um domínio específico
@@ -494,19 +489,17 @@ generate_certificate_for_domain() {
         return 1
     fi
 
-    # Gera certificado usando webroot
+        # Gera certificado usando plugin nginx
     echo -e "    🔐 Solicitando certificado para $domain..."
-
-    if sudo certbot certonly \
-        --webroot \
-        --webroot-path "$CERTBOT_WEBROOT" \
-        --domain "$domain" \
-        --non-interactive \
+    
+    if sudo certbot --nginx \
+        -d "$domain" \
+        --email "admin@$domain" \
         --agree-tos \
-        --email "admin@$domain"; then
+        --non-interactive; then
 
         echo -e "    ${GREEN}✅ Certificado gerado para $domain${NC}"
-        update_nginx_ssl_config "$domain" "$config_name"
+        # Não precisa chamar update_nginx_ssl_config pois o plugin nginx já configura automaticamente
     else
         echo -e "    ${RED}❌ Erro ao gerar certificado para $domain${NC}"
         echo -e "    ${YELLOW}💡 Verifique se o domínio está apontando para este servidor e se a porta 80 está aberta${NC}"
@@ -515,86 +508,88 @@ generate_certificate_for_domain() {
 }
 
 # Função para atualizar configuração do Nginx com certificados SSL
-update_nginx_ssl_config() {
-    local domain=$1
-    local config_name=$2
-    
-    local config_file="$NGINX_CONF_DIR/$config_name"
-    
-    if [[ ! -f "$config_file" ]]; then
-        echo -e "    ${RED}❌ Arquivo de configuração não encontrado: $config_file${NC}"
-        return 1
-    fi
-    
-    # Descomenta a seção HTTPS inteira
-    sudo sed -i 's/^# server {/server {/g' "$config_file"
-    sudo sed -i 's/^#     listen 443 ssl http2;/    listen 443 ssl http2;/g' "$config_file"
-    sudo sed -i 's/^#     server_name/    server_name/g' "$config_file"
-    sudo sed -i 's/^#     # SSL será configurado pelo Certbot/    # SSL será configurado pelo Certbot/g' "$config_file"
-    sudo sed -i 's/^#     # ssl_certificate/    ssl_certificate/g' "$config_file"
-    sudo sed -i 's/^#     # ssl_certificate_key/    ssl_certificate_key/g' "$config_file"
-    sudo sed -i 's/^#     # Logs/    # Logs/g' "$config_file"
-    sudo sed -i 's/^#     access_log/    access_log/g' "$config_file"
-    sudo sed -i 's/^#     error_log/    error_log/g' "$config_file"
-    sudo sed -i 's/^#     # Configurações de segurança/    # Configurações de segurança/g' "$config_file"
-    sudo sed -i 's/^#     add_header/    add_header/g' "$config_file"
-    sudo sed -i 's/^#     # Configurações de proxy/    # Configurações de proxy/g' "$config_file"
-    sudo sed -i 's/^#     proxy_/    proxy_/g' "$config_file"
-    sudo sed -i 's/^#     # Timeouts/    # Timeouts/g' "$config_file"
-    sudo sed -i 's/^#     proxy_connect_timeout/    proxy_connect_timeout/g' "$config_file"
-    sudo sed -i 's/^#     proxy_send_timeout/    proxy_send_timeout/g' "$config_file"
-    sudo sed -i 's/^#     proxy_read_timeout/    proxy_read_timeout/g' "$config_file"
-    sudo sed -i 's/^#     # Buffer settings/    # Buffer settings/g' "$config_file"
-    sudo sed -i 's/^#     proxy_buffering/    proxy_buffering/g' "$config_file"
-    sudo sed -i 's/^#     proxy_buffer_size/    proxy_buffer_size/g' "$config_file"
-    sudo sed -i 's/^#     proxy_buffers/    proxy_buffers/g' "$config_file"
-    
-    # Descomenta seções específicas baseadas no tipo de configuração
-    if [[ "$config_name" == *"backend"* ]]; then
-        sudo sed -i 's/^#     # Default /    # Default location/g' "$config_file"
-        sudo sed -i 's/^#     location \/ {/    location \/ {/g' "$config_file"
-        sudo sed -i 's/^#         proxy_pass/        proxy_pass/g' "$config_file"
-        sudo sed -i 's/^#     }/    }/g' "$config_file"
-    else
-        # Frontend - descomenta seções específicas do frontend
-        sudo sed -i 's/^#     # Gzip compression/    # Gzip compression/g' "$config_file"
-        sudo sed -i 's/^#     gzip/    gzip/g' "$config_file"
-        sudo sed -i 's/^#     # Default location (SPA support) - deve vir primeiro/    # Default location (SPA support) - deve vir primeiro/g' "$config_file"
-        sudo sed -i 's/^#     location \/ {/    location \/ {/g' "$config_file"
-        sudo sed -i 's/^#         proxy_pass/        proxy_pass/g' "$config_file"
-        sudo sed -i 's/^#         try_files/        try_files/g' "$config_file"
-        sudo sed -i 's/^#     }/    }/g' "$config_file"
-        sudo sed -i 's/^#     # Static files cache - deve vir depois da location principal/    # Static files cache - deve vir depois da location principal/g' "$config_file"
-        sudo sed -i 's/^#     location ~\* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)\$ {/    location ~\* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)\$ {/g' "$config_file"
-        sudo sed -i 's/^#         proxy_pass/        proxy_pass/g' "$config_file"
-        sudo sed -i 's/^#         expires/        expires/g' "$config_file"
-        sudo sed -i 's/^#         add_header Cache-Control/        add_header Cache-Control/g' "$config_file"
-        sudo sed -i 's/^#     }/    }/g' "$config_file"
-    fi
-    
-    # Descomenta o fechamento do server block
-    sudo sed -i 's/^# }/}/g' "$config_file"
-    
-    # Atualiza configuração com certificados SSL
-    sudo sed -i "s|# ssl_certificate /etc/letsencrypt/live/$domain/fullchain.pem;|ssl_certificate /etc/letsencrypt/live/$domain/fullchain.pem;|g" "$config_file"
-    sudo sed -i "s|# ssl_certificate_key /etc/letsencrypt/live/$domain/privkey.pem;|ssl_certificate_key /etc/letsencrypt/live/$domain/privkey.pem;|g" "$config_file"
-    
-    # Adiciona configurações SSL modernas após a linha ssl_certificate_key
-    sudo sed -i "/ssl_certificate_key/a\\
-    \\
-    # SSL Configuration\\
-    ssl_protocols TLSv1.2 TLSv1.3;\\
-    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384;\\
-    ssl_prefer_server_ciphers off;\\
-    ssl_session_cache shared:SSL:10m;\\
-    ssl_session_timeout 10m;\\
-    ssl_stapling on;\\
-    ssl_stapling_verify on;\\
-    add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains\" always;\\
-    " "$config_file"
-    
-    echo -e "    ${GREEN}✅ Configuração SSL atualizada para $domain${NC}"
-}
+# NOTA: Esta função não é mais necessária quando usando o plugin --nginx do Certbot
+# O plugin nginx configura automaticamente o SSL
+# update_nginx_ssl_config() {
+#     local domain=$1
+#     local config_name=$2
+#     
+#     local config_file="$NGINX_CONF_DIR/$config_name"
+#     
+#     if [[ ! -f "$config_file" ]]; then
+#         echo -e "    ${RED}❌ Arquivo de configuração não encontrado: $config_file${NC}"
+#         return 1
+#     fi
+#     
+#     # Descomenta a seção HTTPS inteira
+#     sudo sed -i 's/^# server {/server {/g' "$config_file"
+#     sudo sed -i 's/^#     listen 443 ssl http2;/    listen 443 ssl http2;/g' "$config_file"
+#     sudo sed -i 's/^#     server_name/    server_name/g' "$config_file"
+#     sudo sed -i 's/^#     # SSL será configurado pelo Certbot/    # SSL será configurado pelo Certbot/g' "$config_file"
+#     sudo sed -i 's/^#     # ssl_certificate/    ssl_certificate/g' "$config_file"
+#     sudo sed -i 's/^#     # ssl_certificate_key/    ssl_certificate_key/g' "$config_file"
+#     sudo sed -i 's/^#     # Logs/    # Logs/g' "$config_file"
+#     sudo sed -i 's/^#     access_log/    access_log/g' "$config_file"
+#     sudo sed -i 's/^#     error_log/    error_log/g' "$config_file"
+#     sudo sed -i 's/^#     # Configurações de segurança/    # Configurações de segurança/g' "$config_file"
+#     sudo sed -i 's/^#     add_header/    add_header/g' "$config_file"
+#     sudo sed -i 's/^#     # Configurações de proxy/    # Configurações de proxy/g' "$config_file"
+#     sudo sed -i 's/^#     proxy_/    proxy_/g' "$config_file"
+#     sudo sed -i 's/^#     # Timeouts/    # Timeouts/g' "$config_file"
+#     sudo sed -i 's/^#     proxy_connect_timeout/    proxy_connect_timeout/g' "$config_file"
+#     sudo sed -i 's/^#     proxy_send_timeout/    proxy_send_timeout/g' "$config_file"
+#     sudo sed -i 's/^#     proxy_read_timeout/    proxy_read_timeout/g' "$config_file"
+#     sudo sed -i 's/^#     # Buffer settings/    # Buffer settings/g' "$config_file"
+#     sudo sed -i 's/^#     proxy_buffering/    proxy_buffering/g' "$config_file"
+#     sudo sed -i 's/^#     proxy_buffer_size/    proxy_buffer_size/g' "$config_file"
+#     sudo sed -i 's/^#     proxy_buffers/    proxy_buffers/g' "$config_file"
+#     
+#     # Descomenta seções específicas baseadas no tipo de configuração
+#     if [[ "$config_name" == *"backend"* ]]; then
+#         sudo sed -i 's/^#     # Default /    # Default location/g' "$config_file"
+#         sudo sed -i 's/^#     location \/ {/    location \/ {/g' "$config_file"
+#         sudo sed -i 's/^#         proxy_pass/        proxy_pass/g' "$config_file"
+#         sudo sed -i 's/^#     }/    }/g' "$config_file"
+#     else
+#         # Frontend - descomenta seções específicas do frontend
+#         sudo sed -i 's/^#     # Gzip compression/    # Gzip compression/g' "$config_file"
+#         sudo sed -i 's/^#     gzip/    gzip/g' "$config_file"
+#         sudo sed -i 's/^#     # Default location (SPA support) - deve vir primeiro/    # Default location (SPA support) - deve vir primeiro/g' "$config_file"
+#         sudo sed -i 's/^#     location \/ {/    location \/ {/g' "$config_file"
+#         sudo sed -i 's/^#         proxy_pass/        proxy_pass/g' "$config_file"
+#         sudo sed -i 's/^#         try_files/        try_files/g' "$config_file"
+#         sudo sed -i 's/s/^#     }/    }/g' "$config_file"
+#         sudo sed -i 's/^#     # Static files cache - deve vir depois da location principal/    # Static files cache - deve vir depois da location principal/g' "$config_file"
+#         sudo sed -i 's/^#     location ~\* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)\$ {/    location ~\* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)\$ {/g' "$config_file"
+#         sudo sed -i 's/^#         proxy_pass/        proxy_pass/g' "$config_file"
+#         sudo sed -i 's/^#         expires/        expires/g' "$config_file"
+#         sudo sed -i 's/^#         add_header Cache-Control/        add_header Cache-Control/g' "$config_file"
+#         sudo sed -i 's/^#     }/    }/g' "$config_file"
+#     fi
+#     
+#     # Descomenta o fechamento do server block
+#     sudo sed -i 's/^# }/}/g' "$config_file"
+#     
+#     # Atualiza configuração com certificados SSL
+#     sudo sed -i "s|# ssl_certificate /etc/letsencrypt/live/$domain/fullchain.pem;|ssl_certificate /etc/letsencrypt/live/$domain/fullchain.pem;|g" "$config_file"
+#     sudo sed -i "s|# ssl_certificate_key /etc/letsencrypt/live/$domain/privkey.pem;|ssl_certificate_key /etc/letsencrypt/live/$domain/privkey.pem;|g" "$config_file"
+#     
+#     # Adiciona configurações SSL modernas após a linha ssl_certificate_key
+#     sudo sed -i "/ssl_certificate_key/a\\
+#     \\
+#     # SSL Configuration\\
+#     ssl_protocols TLSv1.2 TLSv1.3;\\
+#     ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384;\\
+#     ssl_prefer_server_ciphers off;\\
+#     ssl_session_cache shared:SSL:10m;\\
+#     ssl_session_timeout 10m;\\
+#     ssl_stapling on;\\
+#     ssl_stapling_verify on;\\
+#     add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains\" always;\\
+#     " "$config_file"
+#     
+#     echo -e "    ${GREEN}✅ Configuração SSL atualizada para $domain${NC}"
+# }
 
 # Função para remover configurações do Nginx
 remove_nginx_config() {
