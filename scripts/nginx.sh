@@ -305,7 +305,7 @@ server {
     
     # Static files cache - deve vir ANTES da location principal para SPA
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map)$ {
-        proxy_pass http://localhost:$port;
+        proxy_pass http://localhost:$port/;
         expires 1y;
         add_header Cache-Control "public, immutable";
         add_header Access-Control-Allow-Origin "*";
@@ -387,7 +387,7 @@ server {
 #     
 #     # Static files cache - deve vir ANTES da location principal para SPA
 #     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map)$ {
-#         proxy_pass http://localhost:$port;
+#         proxy_pass http://localhost:$port/;
 #         expires 1y;
 #         add_header Cache-Control "public, immutable";
 #         add_header Access-Control-Allow-Origin "*";
