@@ -153,11 +153,11 @@ up_stack() {
                     echo -e "${GREEN}✅ Configuração do Nginx criada${NC}"
                     
                     # Gera certificados SSL (apenas para domínios válidos)
-                    if generate_ssl_certificates "$STACK_NAME" "$BACKEND_URL" "$FRONTEND_URL"; then
-                        echo -e "${GREEN}✅ Certificados SSL configurados${NC}"
-                    else
-                        echo -e "${YELLOW}⚠️  Certificados SSL não puderam ser gerados (domínios locais ou DNS não configurado)${NC}"
-                    fi
+                    # if generate_ssl_certificates "$STACK_NAME" "$BACKEND_URL" "$FRONTEND_URL"; then
+                    #     echo -e "${GREEN}✅ Certificados SSL configurados${NC}"
+                    # else
+                    #     echo -e "${YELLOW}⚠️  Certificados SSL não puderam ser gerados (domínios locais ou DNS não configurado)${NC}"
+                    # fi
                 else
                     echo -e "${YELLOW}⚠️  Configuração do Nginx falhou (Nginx pode não estar instalado)${NC}"
                 fi
