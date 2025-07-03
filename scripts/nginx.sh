@@ -174,25 +174,6 @@ server {
     proxy_buffer_size 4k;
     proxy_buffers 8 4k;
     
-    # Health check
-    location /health {
-        proxy_pass http://localhost:$port/health;
-        access_log off;
-    }
-    
-    # API routes
-    location /api/ {
-        proxy_pass http://localhost:$port/;
-    }
-    
-    # WebSocket support
-    location /socket.io/ {
-        proxy_pass http://localhost:$port/socket.io/;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-    
     # Default location
     location / {
         proxy_pass http://localhost:$port/;
@@ -238,25 +219,6 @@ server {
 #     proxy_buffering on;
 #     proxy_buffer_size 4k;
 #     proxy_buffers 8 4k;
-#     
-#     # Health check
-#     location /health {
-#         proxy_pass http://localhost:$port/health;
-#         access_log off;
-#     }
-#     
-#     # API routes
-#     location /api/ {
-#         proxy_pass http://localhost:$port/;
-#     }
-#     
-#     # WebSocket support
-#     location /socket.io/ {
-#         proxy_pass http://localhost:$port/socket.io/;
-#         proxy_http_version 1.1;
-#         proxy_set_header Upgrade \$http_upgrade;
-#         proxy_set_header Connection "upgrade";
-#     }
 #     
 #     # Default location
 #     location / {
@@ -344,7 +306,7 @@ server {
     # Default location (SPA support) - deve vir primeiro
     location / {
         proxy_pass http://localhost:$port/;
-        try_files \$uri \$uri/ /index.html;
+        try_files \\$uri \\$uri/ /index.html;
     }
     
     # Static files cache - deve vir depois da location principal
