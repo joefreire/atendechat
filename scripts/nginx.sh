@@ -174,6 +174,25 @@ server {
     proxy_buffer_size 4k;
     proxy_buffers 8 4k;
     
+    # Health check
+    location /health {
+        proxy_pass http://localhost:$port/health;
+        access_log off;
+    }
+    
+    # API routes
+    location /api/ {
+        proxy_pass http://localhost:$port/;
+    }
+    
+    # WebSocket support
+    location /socket.io/ {
+        proxy_pass http://localhost:$port/socket.io/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+    
     # Default location
     location / {
         proxy_pass http://localhost:$port/;
@@ -219,6 +238,25 @@ server {
 #     proxy_buffering on;
 #     proxy_buffer_size 4k;
 #     proxy_buffers 8 4k;
+#     
+#     # Health check
+#     location /health {
+#         proxy_pass http://localhost:$port/health;
+#         access_log off;
+#     }
+#     
+#     # API routes
+#     location /api/ {
+#         proxy_pass http://localhost:$port/;
+#     }
+#     
+#     # WebSocket support
+#     location /socket.io/ {
+#         proxy_pass http://localhost:$port/socket.io/;
+#         proxy_http_version 1.1;
+#         proxy_set_header Upgrade \$http_upgrade;
+#         proxy_set_header Connection "upgrade";
+#     }
 #     
 #     # Default location
 #     location / {
@@ -303,28 +341,17 @@ server {
         application/atom+xml
         image/svg+xml;
     
-    # Static files cache - deve vir ANTES da location principal para SPA
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map)$ {
-        proxy_pass http://localhost:$port/;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-        add_header Access-Control-Allow-Origin "*";
-    }
-    
-    # Default location para SPA (React Router) - deve vir POR ÚLTIMO
+    # Default location (SPA support) - deve vir primeiro
     location / {
         proxy_pass http://localhost:$port/;
-        # Configuração específica para SPA - sempre retorna index.html
-        # para que o React Router possa lidar com as rotas
-        proxy_intercept_errors on;
-        error_page 404 = @fallback;
+        try_files \$uri \$uri/ /index.html;
     }
     
-    # Fallback para SPA - sempre retorna index.html
-    location @fallback {
-        proxy_pass http://localhost:$port/;
-        proxy_set_header Accept-Encoding "";
-        proxy_set_header Accept "text/html";
+    # Static files cache - deve vir depois da location principal
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        proxy_pass http://localhost:$port;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
     }
 }
 
@@ -385,28 +412,17 @@ server {
 #         application/atom+xml
 #         image/svg+xml;
 #     
-#     # Static files cache - deve vir ANTES da location principal para SPA
-#     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map)$ {
-#         proxy_pass http://localhost:$port/;
-#         expires 1y;
-#         add_header Cache-Control "public, immutable";
-#         add_header Access-Control-Allow-Origin "*";
-#     }
-#     
-#     # Default location para SPA (React Router) - deve vir POR ÚLTIMO
+#     # Default location (SPA support) - deve vir primeiro
 #     location / {
 #         proxy_pass http://localhost:$port/;
-#         # Configuração específica para SPA - sempre retorna index.html
-#         # para que o React Router possa lidar com as rotas
-#         proxy_intercept_errors on;
-#         error_page 404 = @fallback;
+#         try_files \$uri \$uri/ /index.html;
 #     }
 #     
-#     # Fallback para SPA - sempre retorna index.html
-#     location @fallback {
-#         proxy_pass http://localhost:$port/;
-#         proxy_set_header Accept-Encoding "";
-#         proxy_set_header Accept "text/html";
+#     # Static files cache - deve vir depois da location principal
+#     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+#         proxy_pass http://localhost:$port;
+#         expires 1y;
+#         add_header Cache-Control "public, immutable";
 #     }
 # }
 EOF
