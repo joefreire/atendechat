@@ -322,7 +322,9 @@ server {
     
     # Fallback para SPA - sempre retorna index.html
     location @fallback {
-        proxy_pass http://localhost:$port/index.html;
+        proxy_pass http://localhost:$port/;
+        proxy_set_header Accept-Encoding "";
+        proxy_set_header Accept "text/html";
     }
 }
 
@@ -402,7 +404,9 @@ server {
 #     
 #     # Fallback para SPA - sempre retorna index.html
 #     location @fallback {
-#         proxy_pass http://localhost:$port/index.html;
+#         proxy_pass http://localhost:$port/;
+#         proxy_set_header Accept-Encoding "";
+#         proxy_set_header Accept "text/html";
 #     }
 # }
 EOF
