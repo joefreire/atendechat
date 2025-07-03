@@ -303,17 +303,26 @@ server {
         application/atom+xml
         image/svg+xml;
     
-    # Default location (SPA support) - deve vir primeiro
-    location / {
-        proxy_pass http://localhost:$port/;
-        try_files \\$uri \\$uri/ /index.html;
-    }
-    
-    # Static files cache - deve vir depois da location principal
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+    # Static files cache - deve vir ANTES da location principal para SPA
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map)$ {
         proxy_pass http://localhost:$port;
         expires 1y;
         add_header Cache-Control "public, immutable";
+        add_header Access-Control-Allow-Origin "*";
+    }
+    
+    # Default location para SPA (React Router) - deve vir POR ÚLTIMO
+    location / {
+        proxy_pass http://localhost:$port/;
+        # Configuração específica para SPA - sempre retorna index.html
+        # para que o React Router possa lidar com as rotas
+        proxy_intercept_errors on;
+        error_page 404 = @fallback;
+    }
+    
+    # Fallback para SPA - sempre retorna index.html
+    location @fallback {
+        proxy_pass http://localhost:$port/index.html;
     }
 }
 
@@ -374,17 +383,26 @@ server {
 #         application/atom+xml
 #         image/svg+xml;
 #     
-#     # Default location (SPA support) - deve vir primeiro
-#     location / {
-#         proxy_pass http://localhost:$port/;
-#         try_files \$uri \$uri/ /index.html;
-#     }
-#     
-#     # Static files cache - deve vir depois da location principal
-#     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+#     # Static files cache - deve vir ANTES da location principal para SPA
+#     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map)$ {
 #         proxy_pass http://localhost:$port;
 #         expires 1y;
 #         add_header Cache-Control "public, immutable";
+#         add_header Access-Control-Allow-Origin "*";
+#     }
+#     
+#     # Default location para SPA (React Router) - deve vir POR ÚLTIMO
+#     location / {
+#         proxy_pass http://localhost:$port/;
+#         # Configuração específica para SPA - sempre retorna index.html
+#         # para que o React Router possa lidar com as rotas
+#         proxy_intercept_errors on;
+#         error_page 404 = @fallback;
+#     }
+#     
+#     # Fallback para SPA - sempre retorna index.html
+#     location @fallback {
+#         proxy_pass http://localhost:$port/index.html;
 #     }
 # }
 EOF
