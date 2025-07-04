@@ -12,7 +12,16 @@ import { CounterManager } from "./counter";
 let io: SocketIO;
 
 export const initIO = (httpServer: Server): SocketIO => {
-  io = new SocketIO(httpServer);
+  io = new SocketIO(httpServer, {
+    cors: {
+      origin: "*",
+      credentials: true,
+      methods: ["GET", "POST", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+    },
+    allowEIO3: true,
+    transports: ['websocket', 'polling']
+  });
 
   io.on("connection", async socket => {
     logger.info("Client Connected");
