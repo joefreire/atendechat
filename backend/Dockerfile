@@ -3,7 +3,11 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Install git, ssh and other dependencies
-RUN apk add --no-cache git openssh-client netcat-openbsd
+RUN apk add --no-cache git openssh-client netcat-openbsd tzdata
+
+# Set timezone
+ENV TZ=America/Sao_Paulo
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Remove package-lock.json to avoid conflicts with yarn
 RUN rm -f package-lock.json
