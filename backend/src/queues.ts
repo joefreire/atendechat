@@ -520,18 +520,25 @@ function calculateDelay(index, baseDelay, longerIntervalAfter, greaterInterval, 
   }
 }
 
-async function getCampaignContacts(campaignId: number, batchSize: number = 100) {
+async function getCampaignContacts(campaignId: number, batchSize: number = 100, offset: number = 0) {
+  // Primeiro, busca a campanha para obter o contactListId
+  const campaign = await Campaign.findByPk(campaignId, {
+    attributes: ['contactListId']
+  });
+
+  if (!campaign || !campaign.contactListId) {
+    return [];
+  }
+
+  // Busca contatos da lista de contatos com paginação
   return await ContactListItem.findAll({
     attributes: ['id', 'name', 'number', 'email'],
-    include: [{
-      model: ContactList,
-      as: 'contactList',
-      attributes: [],
-      where: {
-        '$contactList.Campaign.id$': campaignId
-      }
-    }],
-    limit: batchSize
+    where: {
+      contactListId: campaign.contactListId,
+      isWhatsappValid: true
+    },
+    limit: batchSize,
+    offset: offset
   });
 }
 
@@ -544,7 +551,7 @@ async function handleProcessCampaign(job) {
     
     // Carrega apenas dados essenciais da campanha
     const campaign = await Campaign.findByPk(id, {
-      attributes: ['id', 'companyId', 'scheduledAt', 'status'],
+      attributes: ['id', 'companyId', 'scheduledAt', 'status', 'contactListId'],
       include: [{
         model: Whatsapp,
         as: 'whatsapp',
@@ -557,20 +564,30 @@ async function handleProcessCampaign(job) {
       return;
     }
 
+    if (!campaign.contactListId) {
+      logger.error(`[🚨] - Campanha ${id} não possui lista de contatos associada`);
+      return;
+    }
+
     const settings = await getSettings(campaign);
-    const batchSize = process.env.CAMPAIGN_BATCH_SIZE ? parseInt(process.env.CAMPAIGN_BATCH_SIZE) : 100;
-    const rateLimit = process.env.CAMPAIGN_RATE_LIMIT ? parseInt(process.env.CAMPAIGN_RATE_LIMIT) : 1000;
+    const batchSize = process.env.CAMPAIGN_BATCH_SIZE ? parseInt(process.env.CAMPAIGN_BATCH_SIZE) : 30;
+    const rateLimit = process.env.CAMPAIGN_RATE_LIMIT ? parseInt(process.env.CAMPAIGN_RATE_LIMIT) : 5000;
     let offset = 0;
     let hasMoreContacts = true;
     let totalProcessed = 0;
 
+    logger.info(`[📊] - Iniciando processamento da campanha ${id} com batchSize: ${batchSize}`);
+
     while (hasMoreContacts) {
-      const contacts = await getCampaignContacts(id, batchSize);
+      const contacts = await getCampaignContacts(id, batchSize, offset);
       
       if (contacts.length === 0) {
+        logger.info(`[📊] - Nenhum contato encontrado para a campanha ${id}`);
         hasMoreContacts = false;
         continue;
       }
+
+      logger.info(`[📊] - Processando lote de ${contacts.length} contatos para campanha ${id} (offset: ${offset})`);
 
       const baseDelay = campaign.scheduledAt;
       const longerIntervalAfter = parseToMilliseconds(settings.longerIntervalAfter);
@@ -609,10 +626,17 @@ async function handleProcessCampaign(job) {
       totalProcessed += contacts.length;
       offset += contacts.length;
 
+      // Se o número de contatos retornados é menor que o batchSize, significa que chegamos ao fim
+      if (contacts.length < batchSize) {
+        hasMoreContacts = false;
+        logger.info(`[📊] - Último lote processado para campanha ${id}. Total de contatos: ${totalProcessed}`);
+      }
+
       // Log do progresso
       logger.info(`[📊] - Progresso da campanha ${id}:`, {
         processed: totalProcessed,
         currentBatch: contacts.length,
+        offset: offset,
         memoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB'
       });
 
@@ -639,6 +663,7 @@ async function handleProcessCampaign(job) {
 
     // Tenta reprocessar o job em caso de erro
     if (job.attemptsMade < 3) {
+      logger.info(`[🔄] - Tentativa ${job.attemptsMade + 1} de 3 para campanha ${job.data.id}`);
       await job.retry();
     } else {
       logger.error(`[🚨] - Job falhou após 3 tentativas: ${job.data.id}`);
@@ -647,20 +672,42 @@ async function handleProcessCampaign(job) {
 }
 
 async function handlePrepareContact(job) {
-
   logger.info("Preparando contatos");
   try {
     const { contactId, campaignId, delay, variables }: PrepareContactData =
       job.data;
+    
+    logger.info(`[🏁] - Iniciou a preparação do contato | contatoId: ${contactId} CampanhaID: ${campaignId}`);
+
     const campaign = await getCampaign(campaignId);
+    if (!campaign) {
+      logger.error(`[🚨] - Campanha ${campaignId} não encontrada`);
+      return;
+    }
+
     const contact = await getContact(contactId);
+    if (!contact) {
+      logger.error(`[🚨] - Contato ${contactId} não encontrado`);
+      return;
+    }
+
+    // Verifica se já existe um registro de envio para este contato nesta campanha
+    const existingShipping = await CampaignShipping.findOne({
+      where: {
+        campaignId: campaignId,
+        contactId: contactId
+      }
+    });
+
+    if (existingShipping && existingShipping.deliveredAt) {
+      logger.info(`[📊] - Contato ${contactId} já foi enviado na campanha ${campaignId}`);
+      return;
+    }
 
     const campaignShipping: any = {};
     campaignShipping.number = contact.number;
     campaignShipping.contactId = contactId;
     campaignShipping.campaignId = campaignId;
-
-    logger.info("[🏁] - Iniciou a preparação do contato | contatoId: " + contactId + " CampanhaID: " + campaignId);
 
     const messages = getCampaignValidMessages(campaign);
     if (messages.length) {
@@ -681,7 +728,7 @@ async function handlePrepareContact(job) {
       defaults: campaignShipping
     });
 
-    logger.info("[🚩] - Registro de envio de camapanha para contato criado | contatoId: " + contactId + " CampanhaID: " + campaignId);
+    logger.info(`[🚩] - Registro de envio de campanha para contato criado | contatoId: ${contactId} CampanhaID: ${campaignId}`);
 
     if (
       !created &&
@@ -710,10 +757,15 @@ async function handlePrepareContact(job) {
     }
 
     await verifyAndFinalizeCampaign(campaign);
-    logger.info("[🏁] - Finalizado a preparação do contato | contatoId: " + contactId + " CampanhaID: " + campaignId);
+    logger.info(`[🏁] - Finalizado a preparação do contato | contatoId: ${contactId} CampanhaID: ${campaignId}`);
   } catch (err: any) {
     Sentry.captureException(err);
-    logger.error(`campaignQueue -> PrepareContact -> error: ${err.message}`);
+    logger.error(`[🚨] - campaignQueue -> PrepareContact -> error: ${err.message}`, {
+      contactId: job.data.contactId,
+      campaignId: job.data.campaignId,
+      error: err.message,
+      stack: err.stack
+    });
   }
 }
 
@@ -721,27 +773,33 @@ async function handleDispatchCampaign(job) {
   try {
     const { data } = job;
     const { campaignShippingId, campaignId }: DispatchCampaignData = data;
+    
+    logger.info(`[🏁] - Disparando campanha | CampaignShippingId: ${campaignShippingId} CampanhaID: ${campaignId}`);
+
     const campaign = await getCampaign(campaignId);
+    if (!campaign) {
+      logger.error(`[🚨] - Campanha ${campaignId} não encontrada`);
+      return;
+    }
+
     const wbot = await GetWhatsappWbot(campaign.whatsapp);
 
-    logger.info("[🏁] - Disparando campanha | CampaignShippingId: " + campaignShippingId + " CampanhaID: " + campaignId);
-
     if (!wbot) {
-      logger.error(`campaignQueue -> DispatchCampaign -> error: wbot not found`);
+      logger.error(`[🚨] - Wbot não encontrado para campanha ${campaignId}`);
       return;
     }
 
     if (!campaign.whatsapp) {
-      logger.error(`campaignQueue -> DispatchCampaign -> error: whatsapp not found`);
+      logger.error(`[🚨] - WhatsApp não encontrado para campanha ${campaignId}`);
       return;
     }
 
     if (!wbot?.user?.id) {
-      logger.error(`campaignQueue -> DispatchCampaign -> error: wbot user not found`);
+      logger.error(`[🚨] - Usuário do wbot não encontrado para campanha ${campaignId}`);
       return;
     }
 
-    logger.info("[🚩] - Disparando campanha | CampaignShippingId: " + campaignShippingId + " CampanhaID: " + campaignId);
+    logger.info(`[🚩] - Disparando campanha | CampaignShippingId: ${campaignShippingId} CampanhaID: ${campaignId}`);
 
     const campaignShipping = await CampaignShipping.findByPk(
       campaignShippingId,
@@ -750,13 +808,17 @@ async function handleDispatchCampaign(job) {
       }
     );
 
+    if (!campaignShipping) {
+      logger.error(`[🚨] - CampaignShipping ${campaignShippingId} não encontrado`);
+      return;
+    }
+
     const chatId = `${campaignShipping.number}@s.whatsapp.net`;
 
     let body = campaignShipping.message;
 
     if (!isNil(campaign.fileListId)) {
-
-      logger.info("[🚩] - Recuperando a lista de arquivos | CampaignShippingId: " + campaignShippingId + " CampanhaID: " + campaignId);
+      logger.info(`[🚩] - Recuperando a lista de arquivos | CampaignShippingId: ${campaignShippingId} CampanhaID: ${campaignId}`);
 
       try {
         const publicFolder = path.resolve(__dirname, "..", "public");
@@ -766,16 +828,15 @@ async function handleDispatchCampaign(job) {
           const options = await getMessageOptions(file.path, path.resolve(folder, file.path), file.name);
           await wbot.sendMessage(chatId, { ...options });
 
-          logger.info("[🚩] - Enviou arquivo: "+ file.name +" | CampaignShippingId: " + campaignShippingId + " CampanhaID: " + campaignId);
+          logger.info(`[🚩] - Enviou arquivo: ${file.name} | CampaignShippingId: ${campaignShippingId} CampanhaID: ${campaignId}`);
         };
       } catch (error) {
-        logger.info(error);
+        logger.error(`[🚨] - Erro ao enviar arquivos: ${error.message}`);
       }
     }
 
     if (campaign.mediaPath) {
-
-      logger.info("[🚩] - Preparando midia da campanha: "+ campaign.mediaPath +" | CampaignShippingId: " + campaignShippingId + " CampanhaID: " + campaignId);
+      logger.info(`[🚩] - Preparando mídia da campanha: ${campaign.mediaPath} | CampaignShippingId: ${campaignShippingId} CampanhaID: ${campaignId}`);
 
       const publicFolder = path.resolve(__dirname, "..", "public");
       const filePath = path.join(publicFolder, campaign.mediaPath);
@@ -786,15 +847,14 @@ async function handleDispatchCampaign(job) {
       }
     }
     else {
-
-      logger.info("[🚩] - Enviando mensagem de texto da campanha | CampaignShippingId: " + campaignShippingId + " CampanhaID: " + campaignId);
+      logger.info(`[🚩] - Enviando mensagem de texto da campanha | CampaignShippingId: ${campaignShippingId} CampanhaID: ${campaignId}`);
 
       await wbot.sendMessage(chatId, {
         text: body
       });
     }
 
-    logger.info("[🚩] - Atualizando campanha para enviada... | CampaignShippingId: " + campaignShippingId + " CampanhaID: " + campaignId);
+    logger.info(`[🚩] - Atualizando campanha para enviada... | CampaignShippingId: ${campaignShippingId} CampanhaID: ${campaignId}`);
 
     await campaignShipping.update({ deliveredAt: moment() });
 
@@ -812,8 +872,12 @@ async function handleDispatchCampaign(job) {
 
   } catch (err: any) {
     Sentry.captureException(err);
-    logger.error(err.message);
-    console.log(err.stack);
+    logger.error(`[🚨] - Erro ao disparar campanha: ${err.message}`, {
+      campaignShippingId: job.data.campaignShippingId,
+      campaignId: job.data.campaignId,
+      error: err.message,
+      stack: err.stack
+    });
   }
 }
 

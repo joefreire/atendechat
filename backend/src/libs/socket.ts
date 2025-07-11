@@ -14,8 +14,13 @@ let io: SocketIO;
 export const initIO = (httpServer: Server): SocketIO => {
   io = new SocketIO(httpServer, {
     cors: {
-      origin: process.env.FRONTEND_URL
-    }
+      origin: "*",
+      credentials: true,
+      methods: ["GET", "POST", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+    },
+    allowEIO3: true,
+    transports: ['websocket', 'polling']
   });
 
   io.on("connection", async socket => {

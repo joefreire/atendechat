@@ -3,7 +3,11 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Install git, ssh and other dependencies
-RUN apk add --no-cache git openssh-client netcat-openbsd
+RUN apk add --no-cache git openssh-client netcat-openbsd tzdata
+
+# Set timezone
+ENV TZ=America/Sao_Paulo
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Remove package-lock.json to avoid conflicts with yarn
 RUN rm -f package-lock.json
@@ -11,13 +15,12 @@ RUN rm -f package-lock.json
 COPY backend/package*.json ./
 COPY backend/yarn.lock ./
 COPY backend/node_modules ./node_modules
+COPY backend/ .
 
 # Configure git to use HTTPS instead of SSH
 RUN git config --global url."https://".insteadOf ssh://
 
-# RUN yarn install
-
-COPY backend/ .
+RUN yarn add fluent-ffmpeg @ffmpeg-installer/ffmpeg
 
 COPY certificates ./certs-temp
 
@@ -31,8 +34,7 @@ RUN ./copy_cert_assets.sh
 
 RUN rm -rf ./certs-temp
 
-# RUN yarn build
-COPY backend/build ./build
+RUN yarn build
 
 EXPOSE 3000
 
