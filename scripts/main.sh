@@ -52,6 +52,8 @@ show_help() {
     echo -e "  -w, --frontend-url URL    URL do frontend (padrão: http://localhost:PORT)"
     echo -e "  -c, --cpu CORES           Total de cores CPU (padrão: 2)"
     echo -e "  -m, --memory MB           Total de memória em MB (padrão: 2048)"
+    echo -e "  --color COLOR             Cor do tema (padrão: azul)"
+    echo -e "  --tab-name NAME           Nome da aba (padrão: Codatende)"
     echo -e "\n${GREEN}💰 Opções do módulo financeiro:${NC}"
     echo -e "  -e, --enable-financial    Habilita o módulo financeiro (padrão: desabilitado)"
     echo -e "  -g, --gerencianet-client-id ID      Client ID do Gerencianet"
@@ -65,6 +67,7 @@ show_help() {
     echo -e "  $0 up --name codatende2 --backend-port 4000 --frontend-port 4001"
     echo -e "  $0 up -n codatende3 -b 5000 -f 5001 -c 2 -m 2048"
     echo -e "  $0 up -n codatende4 -u https://api.exemplo.com -w https://app.exemplo.com"
+    echo -e "  $0 up -n codatende5 --color verde --tab-name 'Meu Chat'"
     echo -e "\n  # 💰 Criar instância com módulo financeiro habilitado"
     echo -e "  $0 up -n codatende-finance -e -g CLIENT_ID -s CLIENT_SECRET -p PIX_KEY"
     echo -e "  $0 up --name codatende-finance --enable-financial --gerencianet-client-id CLIENT_ID --gerencianet-client-secret CLIENT_SECRET --gerencianet-pix-key PIX_KEY"
@@ -110,6 +113,8 @@ parse_args() {
     FRONTEND_URL=""
     TOTAL_CPU="2"
     TOTAL_MEMORY="2048"
+    COLOR="#682EE3"
+    TAB_NAME="Atendechat"
     
     # Variáveis do módulo financeiro
     ENABLE_FINANCIAL="false"
@@ -172,6 +177,14 @@ parse_args() {
                 ;;
             -m|--memory)
                 TOTAL_MEMORY="${args[$((i+1))]}"
+                i=$((i+2))
+                ;;
+            --color)
+                COLOR="${args[$((i+1))]}"
+                i=$((i+2))
+                ;;
+            --tab-name)
+                TAB_NAME="${args[$((i+1))]}"
                 i=$((i+2))
                 ;;
             -e|--enable-financial)

@@ -36,6 +36,8 @@ save_instance() {
     local gerencianet_client_id=$9
     local gerencianet_client_secret=${10}
     local gerencianet_pix_key=${11}
+    local color=${12}
+    local tab_name=${13}
     
     init_instances_file
     
@@ -54,6 +56,8 @@ save_instance() {
            --arg gerencianet_client_id "$gerencianet_client_id" \
            --arg gerencianet_client_secret "$gerencianet_client_secret" \
            --arg gerencianet_pix_key "$gerencianet_pix_key" \
+           --arg color "$color" \
+           --arg tab_name "$tab_name" \
            '.instances[$name] = {
                "name": $name,
                "created_at": $created_at,
@@ -68,7 +72,9 @@ save_instance() {
                    "enable_financial": $enable_financial,
                    "gerencianet_client_id": $gerencianet_client_id,
                    "gerencianet_client_secret": $gerencianet_client_secret,
-                   "gerencianet_pix_key": $gerencianet_pix_key
+                   "gerencianet_pix_key": $gerencianet_pix_key,
+                   "color": $color,
+                   "tab_name": $tab_name
                },
                "status": "running"
            }' "$INSTANCES_FILE" > "${INSTANCES_FILE}.tmp" && mv "${INSTANCES_FILE}.tmp" "$INSTANCES_FILE"
@@ -99,6 +105,8 @@ load_instance() {
             export GERENCIANET_CLIENT_ID=$(echo "$config" | jq -r '.gerencianet_client_id // ""')
             export GERENCIANET_CLIENT_SECRET=$(echo "$config" | jq -r '.gerencianet_client_secret // ""')
             export GERENCIANET_PIX_KEY=$(echo "$config" | jq -r '.gerencianet_pix_key // ""')
+            export COLOR=$(echo "$config" | jq -r '.color // "azul"')
+            export TAB_NAME=$(echo "$config" | jq -r '.tab_name // "Codatende"')
             return 0
         fi
     fi

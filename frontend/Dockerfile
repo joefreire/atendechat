@@ -21,6 +21,12 @@ ENV REACT_APP_HOURS_CLOSE_TICKETS_AUTO=$REACT_APP_HOURS_CLOSE_TICKETS_AUTO
 ARG STACK_NAME
 ENV STACK_NAME=$STACK_NAME
 
+ARG REACT_APP_COLOR
+ENV REACT_APP_COLOR=$REACT_APP_COLOR
+
+ARG REACT_APP_TAB_NAME
+ENV REACT_APP_TAB_NAME=$REACT_APP_TAB_NAME
+
 RUN mkdir -p ./brands
 COPY brands ./brands
 
@@ -29,6 +35,16 @@ RUN chmod +x copy_brand_assets.sh
 RUN ./copy_brand_assets.sh
 
 RUN rm -rf ./brands
+
+# Copia e executa o script de atualização do nome da página
+COPY frontend/update_tab_name.sh ./
+RUN chmod +x update_tab_name.sh
+RUN ./update_tab_name.sh
+
+# Copia e executa o script de atualização da cor da aplicação
+COPY frontend/update_app_color.sh ./
+RUN chmod +x update_app_color.sh
+RUN ./update_app_color.sh
 
 # Build the application
 RUN yarn build
