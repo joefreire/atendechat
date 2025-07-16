@@ -9,6 +9,8 @@ services:
         - STACK_NAME=${STACK_NAME}
         - ENABLE_FINANCIAL=${ENABLE_FINANCIAL:-false}
         - GERENCIANET_PIX_CERT=${GERENCIANET_PIX_CERT:-production-cert}
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
     environment:
       - BACKEND_URL=${BACKEND_URL}
       - FRONTEND_URL=${FRONTEND_URL}
@@ -21,16 +23,18 @@ services:
     env_file:
       - .env
     depends_on:
-      - frontend
+      - postgres
+      - redis
     networks:
       - app-network
-      - traefik
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.backend.rule=Host(`api.caamg.com.br`)"
-      - "traefik.http.routers.backend.entrypoints=websecure"
-      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.backend.loadbalancer.server.port=3000"
+    deploy:
+      resources:
+        limits:
+          cpus: '${BACKEND_CPU_LIMIT}'
+          memory: ${BACKEND_MEM_LIMIT}M
+        reservations:
+          cpus: '${BACKEND_CPU_RESERVE}'
+          memory: ${BACKEND_MEM_RESERVE}M
 
   frontend:
     build:
@@ -42,28 +46,59 @@ services:
         - STACK_NAME=${STACK_NAME}
         - REACT_APP_COLOR=${COLOR}
         - REACT_APP_TAB_NAME=${TAB_NAME}
-    environment:
-      - REACT_APP_BACKEND_URL=${BACKEND_URL}
-      - REACT_APP_HOURS_CLOSE_TICKETS_AUTO=24
-      - STACK_NAME=${STACK_NAME}
-      - REACT_APP_COLOR=${COLOR}
-      - REACT_APP_TAB_NAME=${TAB_NAME}
-    env_file:
-      - .env
+    ports:
+      - "${FRONTEND_PORT:-3001}:3001"
     depends_on:
       - backend
     networks:
       - app-network
-      - traefik
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(`app.caamg.com.br`)"
-      - "traefik.http.routers.frontend.entrypoints=websecure"
-      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.frontend.loadbalancer.server.port=3001"
+    deploy:
+      resources:
+        limits:
+          cpus: '${FRONTEND_CPU_LIMIT}'
+          memory: ${FRONTEND_MEM_LIMIT}M
+        reservations:
+          cpus: '${FRONTEND_CPU_RESERVE}'
+          memory: ${FRONTEND_MEM_RESERVE}M
+
+  postgres:
+    image: postgres:14-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres123
+      - POSTGRES_DB=codatende
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '${POSTGRES_CPU_LIMIT}'
+          memory: ${POSTGRES_MEM_LIMIT}M
+        reservations:
+          cpus: '${POSTGRES_CPU_RESERVE}'
+          memory: ${POSTGRES_MEM_RESERVE}M
+
+  redis:
+    image: redis:alpine
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '${REDIS_CPU_LIMIT}'
+          memory: ${REDIS_MEM_LIMIT}M
+        reservations:
+          cpus: '${REDIS_CPU_RESERVE}'
+          memory: ${REDIS_MEM_RESERVE}M
 
 networks:
   app-network:
     driver: bridge
-  traefik:
-    external: true 
+
+volumes:
+  postgres_data:
+  redis_data: 
