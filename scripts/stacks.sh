@@ -78,6 +78,8 @@ up_stack() {
     export FRONTEND_PORT=$FRONTEND_PORT
     export BACKEND_URL=$BACKEND_URL
     export FRONTEND_URL=$FRONTEND_URL
+    export COLOR=$COLOR
+    export TAB_NAME=$TAB_NAME
     
     # Variáveis do módulo financeiro
     export ENABLE_FINANCIAL=$ENABLE_FINANCIAL
@@ -163,7 +165,7 @@ up_stack() {
                 fi
                 
                 # Salva a instância no arquivo JSON
-                save_instance "$STACK_NAME" "$BACKEND_PORT" "$FRONTEND_PORT" "$BACKEND_URL" "$FRONTEND_URL" "$TOTAL_CPU" "$TOTAL_MEMORY" "$ENABLE_FINANCIAL" "$GERENCIANET_CLIENT_ID" "$GERENCIANET_CLIENT_SECRET" "$GERENCIANET_PIX_KEY"
+                save_instance "$STACK_NAME" "$BACKEND_PORT" "$FRONTEND_PORT" "$BACKEND_URL" "$FRONTEND_URL" "$TOTAL_CPU" "$TOTAL_MEMORY" "$ENABLE_FINANCIAL" "$GERENCIANET_CLIENT_ID" "$GERENCIANET_CLIENT_SECRET" "$GERENCIANET_PIX_KEY" "$COLOR" "$TAB_NAME"
                 
                 echo -e "\n${YELLOW}🔗 URLs de acesso:${NC}"
                 echo -e "Backend:  ${GREEN}$BACKEND_URL${NC}"
@@ -337,6 +339,14 @@ update_stack() {
                 provided_params+=("gerencianet_client_secret")
                 i=$((i+2))
                 ;;
+            --color)
+                provided_params+=("color")
+                i=$((i+2))
+                ;;
+            --tab-name)
+                provided_params+=("tab_name")
+                i=$((i+2))
+                ;;
             *)
                 i=$((i+1))
                 ;;
@@ -354,6 +364,8 @@ update_stack() {
     local provided_gerencianet_client_id="$GERENCIANET_CLIENT_ID"
     local provided_gerencianet_client_secret="$GERENCIANET_CLIENT_SECRET"
     local provided_gerencianet_pix_key="$GERENCIANET_PIX_KEY"
+    local provided_color="$COLOR"
+    local provided_tab_name="$TAB_NAME"
     
     # Carrega a instância do arquivo JSON primeiro
     if load_instance "$STACK_NAME"; then
@@ -441,6 +453,19 @@ update_stack() {
         config_changed=true
     fi
     
+    # Alterações de tema
+    if [[ " ${provided_params[@]} " =~ " color " && -n "$provided_color" && "$provided_color" != "$COLOR" ]]; then
+        echo -e "${YELLOW}🎨 Alterando cor do tema para: $provided_color${NC}"
+        COLOR="$provided_color"
+        config_changed=true
+    fi
+    
+    if [[ " ${provided_params[@]} " =~ " tab_name " && -n "$provided_tab_name" && "$provided_tab_name" != "$TAB_NAME" ]]; then
+        echo -e "${YELLOW}📝 Alterando nome da aba para: $provided_tab_name${NC}"
+        TAB_NAME="$provided_tab_name"
+        config_changed=true
+    fi
+    
     if [[ "$config_changed" == "true" ]]; then
         echo -e "${YELLOW}🔄 Recalculando recursos com novas configurações...${NC}"
         calculate_resources $TOTAL_CPU $TOTAL_MEMORY
@@ -480,7 +505,7 @@ update_stack() {
                 echo -e "${GREEN}🎉 Stack $STACK_NAME atualizada com sucesso!${NC}"
                 
                 # Atualiza a instância no arquivo JSON com as novas configurações
-                save_instance "$STACK_NAME" "$BACKEND_PORT" "$FRONTEND_PORT" "$BACKEND_URL" "$FRONTEND_URL" "$TOTAL_CPU" "$TOTAL_MEMORY" "$ENABLE_FINANCIAL" "$GERENCIANET_CLIENT_ID" "$GERENCIANET_CLIENT_SECRET" "$GERENCIANET_PIX_KEY"
+                save_instance "$STACK_NAME" "$BACKEND_PORT" "$FRONTEND_PORT" "$BACKEND_URL" "$FRONTEND_URL" "$TOTAL_CPU" "$TOTAL_MEMORY" "$ENABLE_FINANCIAL" "$GERENCIANET_CLIENT_ID" "$GERENCIANET_CLIENT_SECRET" "$GERENCIANET_PIX_KEY" "$COLOR" "$TAB_NAME"
                 
                 echo -e "${YELLOW}⚙️  Configuração final:${NC}"
                 echo -e "Backend:  ${GREEN}$BACKEND_URL${NC}"
