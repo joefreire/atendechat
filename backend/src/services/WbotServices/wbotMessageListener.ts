@@ -48,6 +48,7 @@ import { cacheLayer } from "../../libs/cache";
 import { provider } from "./providers";
 import { debounce } from "../../helpers/Debounce";
 import { ChatCompletionRequestMessage, Configuration, OpenAIApi } from "openai";
+import SessionManager from "./SessionManager";
 import ffmpeg from "fluent-ffmpeg";
 import {
   SpeechConfig,
@@ -83,6 +84,7 @@ interface SessionOpenAi extends OpenAIApi {
   id?: number;
 }
 const sessionsOpenAi: SessionOpenAi[] = [];
+const sessionManager = SessionManager.getInstance();
 
 interface ImessageUpsert {
   messages: proto.IWebMessageInfo[];
@@ -2863,8 +2865,18 @@ const handleMessage = async (
 
   } catch (err) {
     console.log(err);
-    Sentry.captureException(err);
-    logger.error(`Error handling whatsapp message: Err: ${err}`);
+    
+    // Trata erros de criptografia especificamente
+    const wasCryptoErrorHandled = await sessionManager.handleCryptoError(err, wbot, {
+      messageId: msg.key.id,
+      companyId,
+      timestamp: new Date().toISOString()
+    });
+
+    if (!wasCryptoErrorHandled) {
+      Sentry.captureException(err);
+      logger.error(`Error handling whatsapp message: Err: ${err}`);
+    }
   }
 };
 
@@ -2969,8 +2981,23 @@ const wbotMessageListener = async (
         });
 
         if (!messageExists) {
-          await handleMessage(message, wbot, companyId);
-          await verifyCampaignMessageAndCloseTicket(message, companyId);
+          try {
+            await handleMessage(message, wbot, companyId);
+            await verifyCampaignMessageAndCloseTicket(message, companyId);
+          } catch (error) {
+            // Trata erros de criptografia no processamento de mensagens
+            const wasCryptoErrorHandled = await sessionManager.handleCryptoError(error, wbot, {
+              messageId: message.key.id,
+              companyId,
+              timestamp: new Date().toISOString(),
+              context: 'message_processing'
+            });
+
+            if (!wasCryptoErrorHandled) {
+              Sentry.captureException(error);
+              logger.error(`Error processing message ${message.key.id}: ${error}`);
+            }
+          }
         }
       }
     });
@@ -2988,8 +3015,17 @@ const wbotMessageListener = async (
     //   messageSet.messages.filter(filterMessages).map(msg => msg);
     // });
   } catch (error) {
-    Sentry.captureException(error);
-    logger.error(`Error handling wbot message listener. Err: ${error}`);
+    // Trata erros de criptografia no listener
+    const wasCryptoErrorHandled = await sessionManager.handleCryptoError(error, wbot, {
+      companyId,
+      timestamp: new Date().toISOString(),
+      context: 'message_listener'
+    });
+
+    if (!wasCryptoErrorHandled) {
+      Sentry.captureException(error);
+      logger.error(`Error handling wbot message listener. Err: ${error}`);
+    }
   }
 };
 
